@@ -30,27 +30,46 @@ int round_up_size(int size) {
     return ((size - 1) & ~0x0f) + 16;
 }
 
+void throwOutOfMemory(JNIEnv *env) {
+    jclass exceptionCls = (*env)->FindClass(env, "java/lang/RuntimeException");
+    (*env)->ThrowNew(env, exceptionCls, "Out of off-heap memory in JNI call");
+}
+void throwAny(JNIEnv *env, char *msg) {
+    jclass exceptionCls = (*env)->FindClass(env, "java/lang/RuntimeException");
+    (*env)->ThrowNew(env, exceptionCls, msg);
+}
+
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natOpen
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JNIEnv *env, jobject me, jint size) {
-    // round up the size to multiples of 32, for the collision indicator
-    size = ((size - 1) | 31) + 1;
-    struct map *mapdata = malloc(sizeof(struct map));
-    mapdata->currentEntries = 0;
-    mapdata->maxEntries = size;
-    mapdata->data = calloc(size, sizeof(struct entry *));
-
     thisClass = (*env)->NewGlobalRef(env, (*env)->GetObjectClass(env, me)); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
 
     // Get the Field ID of the instance variables "number"
     fidNumber = (*env)->GetFieldID(env, thisClass, "cStruct", "J");
-    if (NULL == fidNumber)
+    if (!fidNumber) {
+        throwAny(env, "Invoking class must have a field long cStruct");
         return;
+    }
 
-    printf("jpawMap: created new map at %p\n", mapdata);
+    // round up the size to multiples of 32, for the collision indicator
+    size = ((size - 1) | 31) + 1;
+    struct map *mapdata = malloc(sizeof(struct map));
+    if (!mapdata) {
+        throwOutOfMemory(env);
+        return;
+    }
+    mapdata->currentEntries = 0;
+    mapdata->maxEntries = size;
+    mapdata->data = calloc(size, sizeof(struct entry *));
+    if (!mapdata->data) {
+        throwOutOfMemory(env);
+        return;
+    }
+
+    // printf("jpawMap: created new map at %p\n", mapdata);
     (*env)->SetLongField(env, me, fidNumber, (jlong) mapdata);
 }
 
@@ -80,11 +99,13 @@ void clear(struct entry **data, int numEntries) {
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(JNIEnv *env, jobject me) {
     // Get the int given the Field ID
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
-    printf("jpawMap: closing map at %p\n", mapdata);
-    (*env)->SetLongField(env, me, fidNumber, (jlong) 0);
+    // printf("jpawMap: closing map at %p\n", mapdata);
     clear(mapdata->data, mapdata->maxEntries);
     free(mapdata->data);
     free(mapdata);
+    (*env)->SetLongField(env, me, fidNumber, (jlong) 0);
+    (*env)->DeleteGlobalRef(env, thisClass);
+    thisClass = NULL;
 }
 
 /*
@@ -109,6 +130,11 @@ static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
         // uncompress it
         // TODO: can the temporary buffer be avoided, i.e. we write directly into the jbyteArray buffer? It would skip 1 malloc / free plus an array copy
         char *tmp = malloc(e->uncompressedSize);
+        if (!tmp) {
+            throwOutOfMemory(env);
+            // TODO: release result?
+            return result;
+        }
         LZ4_decompress_fast(e->data, tmp, e->uncompressedSize);
         (*env)->SetByteArrayRegion(env, result, 0, e->uncompressedSize, (jbyte *)tmp);
         free(tmp);
@@ -215,18 +241,30 @@ struct entry *create_new_entry(JNIEnv *env, jbyteArray data, jboolean doCompress
     if (doCompress) {
         // compress the data
         char *tmp_src = malloc(uncompressed_length);
+        if (!tmp_src)
+            return NULL;  // will throw OOM
         (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)tmp_src);
         int tmp_length = LZ4_compressBound(uncompressed_length);
         char *tmp_dst = malloc(tmp_length);
+        if (!tmp_dst) {
+            free(tmp_src);
+            return NULL;  // will throw OOM
+        }
         int actual_compressed_length = LZ4_compress(tmp_src, tmp_dst, uncompressed_length);
         free(tmp_src);
         e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(actual_compressed_length));
+        if (!e) {
+            free(tmp_dst);
+            return NULL;  // will throw OOM
+        }
         e->uncompressedSize = uncompressed_length;
         e->compressedSize = actual_compressed_length;
         memcpy(e->data, tmp_dst, actual_compressed_length);
         free(tmp_dst);
     } else {
         e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(uncompressed_length));
+        if (!e)
+            return NULL;  // will throw OOM
         e->uncompressedSize = uncompressed_length;
         e->compressedSize = 0;
         (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)e->data);
@@ -239,11 +277,13 @@ struct entry * setPutSub(JNIEnv *env, jobject me, jlong key, jbyteArray data, jb
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
     int hash = computeHash(key, mapdata->maxEntries);
     struct entry *newEntry = create_new_entry(env, data, doCompress);
-    newEntry->key = key;
-    newEntry->nextSameHash = mapdata->data[hash];
-
+    if (!newEntry) {
+        throwOutOfMemory(env);
+        return NULL;
+    }
     struct entry *e = mapdata->data[hash];
     newEntry->nextSameHash = e;  // insert it at the start
+    newEntry->key = key;
     mapdata->data[hash] = newEntry;
     struct entry *prev = newEntry;
 
@@ -251,7 +291,7 @@ struct entry * setPutSub(JNIEnv *env, jobject me, jlong key, jbyteArray data, jb
         // check if this is a match
         if (e->key == key) {
             // replace that entry by the new one
-            prev->nextSameHash = newEntry;
+            prev->nextSameHash = e->nextSameHash;
             return e;
         }
         prev = e;
