@@ -1,22 +1,22 @@
-#undef __cplusplus
-#include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <jni.h>
+#include <lz4.h>
 #include "jpawMap.h"
 
 struct entry {
-	int uncompressedSize;
-	int compressedSize;  // 0 = is not compressed
-	jlong key;
-	struct entry *nextSameHash;
-	char data[];
+    int uncompressedSize;
+    int compressedSize;  // 0 = is not compressed
+    jlong key;
+    struct entry *nextSameHash;
+    char data[];
 };
 
 struct map {
-	int currentEntries;
-	int maxEntries;
-	int *collisionIndicator;
-	struct entry **data;
+    int currentEntries;
+    int maxEntries;
+    struct entry **data;
 };
 
 static jclass thisClass;
@@ -24,123 +24,273 @@ static jfieldID fidNumber;
 
 // reference: see http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
 
+
+// round the size to be allocated to the next multiple of 16, because malloc anyway returns multiples of 16.
+int round_up_size(int size) {
+    return ((size - 1) & ~0x0f) + 16;
+}
+
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natMake
- * Signature: (II)V
+ * Method:    natOpen
+ * Signature: (I)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natMake
-  (JNIEnv *env, jobject me, jint size) {
-	// round up the size to multiples of 32, for the collision indicator
-	size = ((size - 1) | 31) + 1;
-	struct map *mapdata = malloc(sizeof(struct map));
-	mapdata->currentEntries = 0;
-	mapdata->maxEntries = size;
-	mapdata->collisionIndicator = calloc(size >> 5, sizeof(int));
-	mapdata->data = calloc(size, sizeof(struct entry *));
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JNIEnv *env, jobject me, jint size) {
+    // round up the size to multiples of 32, for the collision indicator
+    size = ((size - 1) | 31) + 1;
+    struct map *mapdata = malloc(sizeof(struct map));
+    mapdata->currentEntries = 0;
+    mapdata->maxEntries = size;
+    mapdata->data = calloc(size, sizeof(struct entry *));
 
-	thisClass = (*env)->NewGlobalRef(env, (*env)->GetObjectClass(env, me));  // call to newGlobalRef is required because otherwise jclass is only valid for the current call
+    thisClass = (*env)->NewGlobalRef(env, (*env)->GetObjectClass(env, me)); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
 
     // Get the Field ID of the instance variables "number"
     fidNumber = (*env)->GetFieldID(env, thisClass, "cStruct", "J");
     if (NULL == fidNumber)
-    	return;
+        return;
 
     printf("jpawMap: created new map at %p\n", mapdata);
-    (*env)->SetLongField(env, me, fidNumber, (jlong)mapdata);
+    (*env)->SetLongField(env, me, fidNumber, (jlong) mapdata);
 }
 
 int computeHash(jlong arg, int size) {
     arg *= 33;
-    return ((int)(arg ^ (arg >> 32)) & 0x7fffffff) % size;
+    return ((int) (arg ^ (arg >> 32)) & 0x7fffffff) % size;
+}
+
+// clear all entries
+void clear(struct entry **data, int numEntries) {
+    int i;
+    for (i = 0; i < numEntries; ++i) {
+        struct entry *p = data[i];
+        while (p) {
+            register struct entry *next = p->nextSameHash;
+            free(p);
+            p = next;
+        }
+    }
 }
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    close
+ * Method:    natClose
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_close
-  (JNIEnv *env, jobject me) {
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(JNIEnv *env, jobject me) {
     // Get the int given the Field ID
-	struct map *mapdata = (struct map *)((*env)->GetLongField(env, me, fidNumber));
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
     printf("jpawMap: closing map at %p\n", mapdata);
-    (*env)->SetLongField(env, me, fidNumber, (jlong)0);
+    (*env)->SetLongField(env, me, fidNumber, (jlong) 0);
+    clear(mapdata->data, mapdata->maxEntries);
+    free(mapdata->data);
+    free(mapdata);
+}
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natClear
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(JNIEnv *env, jobject me) {
+    // Get the int given the Field ID
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    clear(mapdata->data, mapdata->maxEntries);
+    memset(mapdata->data, 0, mapdata->maxEntries * sizeof(struct entry *));     // set the initial pointers to NULL
 }
 
 static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
-	if (!e)
-		return (jbyteArray)0;
-	jbyteArray result = (*env)->NewByteArray(env, e->uncompressedSize);
-	(*env)->SetByteArrayRegion(env, result, 0, e->uncompressedSize, e->data);
-	return result;
+    if (!e)
+        return (jbyteArray) 0;
+    jbyteArray result = (*env)->NewByteArray(env, e->uncompressedSize);
+    if (!e->compressedSize) {
+        (*env)->SetByteArrayRegion(env, result, 0, e->uncompressedSize, (jbyte *)e->data);
+    } else {
+        // uncompress it
+        // TODO: can the temporary buffer be avoided, i.e. we write directly into the jbyteArray buffer? It would skip 1 malloc / free plus an array copy
+        char *tmp = malloc(e->uncompressedSize);
+        LZ4_decompress_fast(e->data, tmp, e->uncompressedSize);
+        (*env)->SetByteArrayRegion(env, result, 0, e->uncompressedSize, (jbyte *)tmp);
+        free(tmp);
+    }
+    return result;
 }
 
+
+struct entry *find_entry(struct map *mapdata, long key) {
+    int hash = computeHash(key, mapdata->maxEntries);
+    struct entry *e = mapdata->data[hash];
+    while (e) {
+        // check if this is a match
+        if (e->key == key)
+            return e;
+        e = e->nextSameHash;
+    }
+    return e;  // null
+}
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    get
+ * Method:    natGet
  * Signature: (J)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_get
-  (JNIEnv *env, jobject me, jlong key) {
-	struct map *mapdata = (struct map *)((*env)->GetLongField(env, me, fidNumber));
-	int hash = computeHash(key, mapdata->maxEntries);
-	return toJavaByteArray(env, mapdata->data[hash]);
-}
-
-struct entry * setPutSub(JNIEnv *env, jobject me, jlong key, jbyteArray data) {
-	struct entry *previousEntry = NULL;
-	struct map *mapdata = (struct map *)((*env)->GetLongField(env, me, fidNumber));
-	int hash = computeHash(key, mapdata->maxEntries);
-	struct entry *e = mapdata->data[hash];
-
-	if (e != NULL) {
-		// release old data
-		--mapdata->currentEntries;
-		previousEntry = e;
-	}
-	if (data == NULL) {
-		mapdata->data[hash] = NULL;
-	} else {
-		// TODO: optimize for the case where old / new size are similar / same bucket
-		++mapdata->currentEntries;
-		jsize newLength = (*env)->GetArrayLength(env, data);
-		struct entry *newEntry = malloc(sizeof(struct entry) + newLength);
-		newEntry->uncompressedSize = newLength;
-		newEntry->compressedSize = 0;
-		newEntry->key = key;
-		(*env)->GetByteArrayRegion(env, data, 0, newLength, newEntry->data);
-		mapdata->data[hash] = newEntry;
-	}
-	return previousEntry;
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGet(JNIEnv *env, jobject me, jlong key) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    struct entry *e = find_entry(mapdata, key);
+    return toJavaByteArray(env, e);
 }
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    set
- * Signature: (J[B)V
+ * Method:    natLength
+ * Signature: (J)I
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_set
-  (JNIEnv *env, jobject me, jlong key, jbyteArray data) {
-	struct entry *previousEntry = setPutSub(env, me, key, data);
-
-	if (previousEntry != NULL)
-		free(previousEntry);
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(JNIEnv *env, jobject me, jlong key) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    struct entry *e = find_entry(mapdata, key);
+    return (jint)(e ? e->uncompressedSize : -1);
 }
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    put
- * Signature: (J[B)[B
+ * Method:    natRemove
+ * Signature: (J)Z
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_put
-  (JNIEnv *env, jobject me, jlong key, jbyteArray data) {
-	struct entry *previousEntry = setPutSub(env, me, key, data);
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong key) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    int hash = computeHash(key, mapdata->maxEntries);
+    struct entry *prev = NULL;
+    struct entry *e = mapdata->data[hash];
+    while (e) {
+        // check if this is a match
+        if (e->key == key) {
+            if (!prev) {
+                // initial entry, update mapdata
+                mapdata->data[hash] = e->nextSameHash;
+            } else {
+                prev->nextSameHash = e->nextSameHash;
+            }
+            free(e);
+            return JNI_TRUE;
+        }
+        prev = e;
+        e = e->nextSameHash;
+    }
+    return JNI_FALSE;
+}
 
-	if (previousEntry != NULL) {
-		jbyteArray result = toJavaByteArray(env, previousEntry);
-		free(previousEntry);
-		return result;
-	}
-	return NULL;
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetAndRemove
+ * Signature: (J)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetAndRemove(JNIEnv *env, jobject me, jlong key) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    int hash = computeHash(key, mapdata->maxEntries);
+    struct entry *prev = NULL;
+    struct entry *e = mapdata->data[hash];
+    while (e) {
+        // check if this is a match
+        if (e->key == key) {
+            if (!prev) {
+                // initial entry, update mapdata
+                mapdata->data[hash] = e->nextSameHash;
+            } else {
+                prev->nextSameHash = e->nextSameHash;
+            }
+            jbyteArray result = toJavaByteArray(env, e);
+            free(e);
+            return result;
+        }
+        prev = e;
+        e = e->nextSameHash;
+    }
+    return (jbyteArray)0;
+}
+
+
+struct entry *create_new_entry(JNIEnv *env, jbyteArray data, jboolean doCompress) {
+    int uncompressed_length = (*env)->GetArrayLength(env, data);
+    struct entry *e;
+    if (doCompress) {
+        // compress the data
+        char *tmp_src = malloc(uncompressed_length);
+        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)e->data);
+        int tmp_length = LZ4_compressBound(uncompressed_length);
+        char *tmp_dst = malloc(tmp_length);
+        int actual_compressed_length = LZ4_compress(tmp_src, tmp_dst, uncompressed_length);
+        free(tmp_src);
+        e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(actual_compressed_length));
+        e->uncompressedSize = uncompressed_length;
+        e->compressedSize = actual_compressed_length;
+        memcpy(e->data, tmp_dst, actual_compressed_length);
+        free(tmp_dst);
+    } else {
+        e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(uncompressed_length));
+        e->uncompressedSize = uncompressed_length;
+        e->compressedSize = 0;
+        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)e->data);
+    }
+    return e;
+}
+
+
+struct entry * setPutSub(JNIEnv *env, jobject me, jlong key, jbyteArray data, jboolean doCompress) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    int hash = computeHash(key, mapdata->maxEntries);
+    struct entry *newEntry = create_new_entry(env, data, doCompress);
+    newEntry->key = key;
+    newEntry->nextSameHash = mapdata->data[hash];
+
+    struct entry *e = mapdata->data[hash];
+    newEntry->nextSameHash = e;  // insert it at the start
+    mapdata->data[hash] = newEntry;
+    struct entry *prev = newEntry;
+
+    while (e) {
+        // check if this is a match
+        if (e->key == key) {
+            // replace that entry by the new one
+            prev->nextSameHash = newEntry;
+            return e;
+        }
+        prev = e;
+        e = e->nextSameHash;
+    }
+    // this is a new entry
+    return NULL;
+}
+
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natSet
+ * Signature: (J[BZ)Z
+ */
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet(
+        JNIEnv *env, jobject me, jlong key, jbyteArray data, jboolean doCompress) {
+
+    struct entry *previousEntry = setPutSub(env, me, key, data, doCompress);
+
+    if (previousEntry != NULL) {
+        free(previousEntry);
+        return JNI_FALSE;
+    }
+    return JNI_TRUE;  // was a new entry
+}
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natPut
+ * Signature: (J[BZ)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut(JNIEnv *env, jobject me, jlong key, jbyteArray data, jboolean doCompress) {
+    struct entry *previousEntry = setPutSub(env, me, key, data, doCompress);
+
+    if (previousEntry != NULL) {
+        jbyteArray result = toJavaByteArray(env, previousEntry);
+        free(previousEntry);
+        return result;
+    }
+    return NULL;
 }

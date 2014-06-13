@@ -2,8 +2,7 @@ package de.jpaw.offHeap;
 
 /** Implements a long -> byte [] hash map off heap, using JNI.
  * null values cannot be stored in the map (as they are used to indicate a missing entry, but zero-length byte arrays can.
- * Internally, all zero-length byte arrays are stored as a reference to a common location, therefore storing a zero length
- * array costs no memory and is therefore not suitable to perform benchmarks with. Zero length arrays are therefore never compressed.
+ * Zero length arrays are therefore never compressed.
  * 
  *  This implementation is not thread-safe. */
 public class LongToByteArrayOffHeapMap {
