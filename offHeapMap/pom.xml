@@ -54,6 +54,7 @@
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
+<!--             
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>native-maven-plugin</artifactId>
@@ -61,6 +62,43 @@
                 <configuration>
                     <javahOutputDirectory>${project.build.directory}/src/main/c</javahOutputDirectory>
                 </configuration>
+            </plugin>
+ -->            
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>1.7</version>
+                <executions>
+                    <execution>
+                        <phase>process-classes</phase>
+                        <configuration>
+                            <target
+                                name="jni"
+                                description="Generate headers and compile the native code">
+                                <echo>Generating JNI headers</echo>
+                                <!-- Does not work with OpenJDK, because Ant javah assumes Sun JVM
+                                <javah
+                                    destdir="${project.basedir}/src/main/c"
+                                    classpath="${project.build.outputDirectory}">
+                                    <class name="de.jpaw.offHeap.LongToByteArrayOffHeapMap"/>
+                                </javah>
+                                 -->
+                                <exec executable="javah" >
+                                    <arg value="-o" />
+                                    <arg value="${project.basedir}/src/main/c/jpawMap.h" />
+                                    <arg value="-classpath" />
+                                    <arg value="${project.build.outputDirectory}" />
+                                    <arg value="-force" />
+                                    <arg value="de.jpaw.offHeap.LongToByteArrayOffHeapMap" />
+                                </exec>
+
+                                <exec executable="make" ></exec>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-clean-plugin</artifactId>
@@ -74,7 +112,17 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.14</version>
                 <configuration>
+                    <!-- cannot use target/lib because we depend on additional 4rd party libraries (lz4) -->
                     <argLine>-Djava.library.path=${user.home}/lib</argLine>
+                    
+<!-- This does not work:
+                    <systemProperties>
+                        <property>
+                            <name>java.library.path</name>
+                            <value>${user.home}/lib</value>
+                        </property>
+                    </systemProperties>
+ -->                    
                 </configuration>
             </plugin>
         </plugins>

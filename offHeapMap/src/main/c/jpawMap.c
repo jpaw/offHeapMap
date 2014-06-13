@@ -8,13 +8,13 @@ struct entry {
 	int uncompressedSize;
 	int compressedSize;  // 0 = is not compressed
 	jlong key;
+	struct entry *nextSameHash;
 	char data[];
 };
 
 struct map {
 	int currentEntries;
 	int maxEntries;
-	int compressAboveSize;
 	int *collisionIndicator;
 	struct entry **data;
 };
@@ -30,13 +30,12 @@ static jfieldID fidNumber;
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natMake
-  (JNIEnv *env, jobject me, jint size, jint compressAboveSize) {
+  (JNIEnv *env, jobject me, jint size) {
 	// round up the size to multiples of 32, for the collision indicator
 	size = ((size - 1) | 31) + 1;
 	struct map *mapdata = malloc(sizeof(struct map));
 	mapdata->currentEntries = 0;
 	mapdata->maxEntries = size;
-	mapdata->compressAboveSize = compressAboveSize;
 	mapdata->collisionIndicator = calloc(size >> 5, sizeof(int));
 	mapdata->data = calloc(size, sizeof(struct entry *));
 
