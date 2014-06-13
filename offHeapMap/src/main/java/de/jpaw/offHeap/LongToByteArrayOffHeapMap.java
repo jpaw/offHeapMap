@@ -18,8 +18,8 @@ public class LongToByteArrayOffHeapMap {
     private int currentSize = 0;
     
     /** The threshold at which entries stored should be automatically compressed, in bytes.
-     * Setting it to Integer.MAX_VAL will disable compression. Setting it to 0 will perform compression for all (non-zero-length) items. */
-    private int maxUncompressedSize = 0;
+     * Setting it to Integer.MAX_VALUE will disable compression. Setting it to 0 will perform compression for all (non-zero-length) items. */
+    private int maxUncompressedSize = Integer.MAX_VALUE;
 
     
     //

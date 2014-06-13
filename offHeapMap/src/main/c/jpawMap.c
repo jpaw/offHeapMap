@@ -215,7 +215,7 @@ struct entry *create_new_entry(JNIEnv *env, jbyteArray data, jboolean doCompress
     if (doCompress) {
         // compress the data
         char *tmp_src = malloc(uncompressed_length);
-        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)e->data);
+        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)tmp_src);
         int tmp_length = LZ4_compressBound(uncompressed_length);
         char *tmp_dst = malloc(tmp_length);
         int actual_compressed_length = LZ4_compress(tmp_src, tmp_dst, uncompressed_length);

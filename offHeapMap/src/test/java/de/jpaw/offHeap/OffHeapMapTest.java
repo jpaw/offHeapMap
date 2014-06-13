@@ -15,7 +15,7 @@ public class OffHeapMapTest {
         myMap.close();
     }
 
-    public void runStoreRetrieveTest() {
+    public void runStoreRetrieveTestUncompressed() {
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
         byte [] oldData = TEXT.getBytes();
         myMap.set(KEY, oldData);
@@ -33,5 +33,23 @@ public class OffHeapMapTest {
         myMap.close();
     }
 
+//    public void runStoreRetrieveTestCompressed() {
+//        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
+//        myMap.setMaxUncompressedSize(0);
+//        byte [] oldData = TEXT.getBytes();
+//        myMap.set(KEY, oldData);
+//        
+//        assert(myMap.get(KEY - 1L) == null);
+//        assert(myMap.get(KEY + 1L) == null);
+//        assert(myMap.get(KEY) != null);
+//        byte [] newData = myMap.get(KEY);
+//        assert(newData.length == oldData.length);
+//        String newText = new String(newData);
+//        System.out.println(TEXT);
+//        System.out.println(newText);
+//        assert(Arrays.equals(newData, oldData));
+//        
+//        myMap.close();
+//    }
 
 }
