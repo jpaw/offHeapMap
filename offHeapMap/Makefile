@@ -1,8 +1,8 @@
 TARGET=libjpawMap.so
 CC=gcc
-DEBUG_OR_OPT=-g
+DEBUG_OR_OPT=-O3
 CFLAGS=-c -Wall -fPIC -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux $(DEBUG_OR_OPT)
-LDFLAGS=-fPIC -shared $(DEBUG_OR_OPT)
+LDFLAGS=-fPIC -shared $(DEBUG_OR_OPT) -L$(HOME)/lib -llz4
 
 SRCDIR=src/main/c
 OBJDIR=target/o
