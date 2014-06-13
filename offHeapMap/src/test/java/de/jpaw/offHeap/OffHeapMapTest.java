@@ -11,12 +11,12 @@ public class OffHeapMapTest {
     static public final Long KEY = 437L;
     
     public void runOpenCloseTest() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000, 99999);
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
         myMap.close();
     }
 
     public void runStoreRetrieveTest() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000, 99999);
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
         byte [] oldData = TEXT.getBytes();
         myMap.set(KEY, oldData);
         
