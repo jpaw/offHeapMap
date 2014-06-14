@@ -1,5 +1,7 @@
 package de.jpaw.offHeap;
 
+import java.io.PrintStream;
+
 /** Implements a long -> byte [] hash map off heap, using JNI.
  * null values cannot be stored in the map (as they are used to indicate a missing entry, but zero-length byte arrays can.
  * Zero length arrays are therefore never compressed.
@@ -25,6 +27,10 @@ public class LongToByteArrayOffHeapMap {
     //
     // internal native API
     //
+    
+    /** Initialization of the JNI code. Must be called before any other method is used. May only be called once.
+     */
+    private native void natInit();
     
     /** Allocates and initializes a new data structure for the given maximum number of elements.
      * Stores the resulting off heap location in the private field cStruct.
@@ -63,6 +69,10 @@ public class LongToByteArrayOffHeapMap {
      * data may not be null (use get(key) for that purpose). */
     private native byte [] natPut(long key, byte [] data, boolean doCompress);
     
+    /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
+     * Chains of bigger length are not counted. The method returns the longest chain length. */
+    private native int natGetHistogram(int [] chainsOfLength);
+    
     
     
     //
@@ -80,6 +90,7 @@ public class LongToByteArrayOffHeapMap {
             if (!isInitialized) {
                 System.loadLibrary("lz4");      // Load native library at runtime
                 System.loadLibrary("jpawMap");  // Load native library at runtime
+                natInit();
                 // now we are (unless an Exception was thrown)
                 isInitialized = Boolean.TRUE;
             }
@@ -91,6 +102,13 @@ public class LongToByteArrayOffHeapMap {
     public int size() {
         return currentSize;
     }
+    
+    /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
+     * Chains of bigger length are not counted. The method returns the longest chain length. */
+    public int getHistogram(int [] chainsOfLength) {
+        return natGetHistogram(chainsOfLength);
+    }
+    
     
     public int getMaxUncompressedSize() {
         return maxUncompressedSize;
@@ -174,5 +192,16 @@ public class LongToByteArrayOffHeapMap {
         if (natStoreRegion(key, data, offset, length, shouldICompressThis(data))) {
             ++currentSize;
         }
+    }
+
+    /** Prints the histogram of the hash distribution. */
+    public void printHistogram(int len, PrintStream out) {
+        if (out == null)
+            out = System.out;
+        int [] histogram = new int [len];
+        int maxChainLen = natGetHistogram(histogram);
+        out.println("Currently " + size() + " entries are stored, with maximum chain length " + maxChainLen);
+        for (int i = 0; i < len; ++i)
+            out.println(String.format("%6d Chains of length %3d", histogram[i], i));
     }
 }

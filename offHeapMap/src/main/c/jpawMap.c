@@ -5,22 +5,69 @@
 #include <lz4.h>
 #include "jpawMap.h"
 
+#undef SEPARATE_COMMITTED_VIEW
+
+
 struct entry {
     int uncompressedSize;
     int compressedSize;  // 0 = is not compressed
     jlong key;
     struct entry *nextSameHash;
+#ifdef SEPARATE_COMMITTED_VIEW
+    struct entry *nextInCommittedView;
+#endif
     char data[];
 };
 
 struct map {
-    int currentEntries;
-    int maxEntries;
+    int hashTableSize;
+    int filler;
     struct entry **data;
+#ifdef SEPARATE_COMMITTED_VIEW
+    struct entry **committedViewData;
+#endif
 };
 
-static jclass thisClass;
+// stores a single modification of the maps.
+// the relevant types are insert / update / remove.
+// The type can be determined by which ptr is null and which not.
+// the "nextSameHash" entries are "misused"
+struct transaction_log_entry {
+    struct map *affected_table;
+    struct entry *old_entry;
+    struct entry *new_entry;
+};
+
+#define TX_LOG_ENTRIES_PER_CHUNK 168
+
+
+// transaction modes. bitwise ORed, they go into the modes field of current_transaction
+
+#define TRANSACTIONAL 0x01     // allow to rollback / safepoints
+#define REDOLOG_ASYNC 0x02     // allow replaying on a different database - fast
+#define REDOLOG_SYNC 0x04      // allow replaying on a different database - safe
+
+// size of this is 8 + 168 * 24 = 4040 byte.
+// It should fit into a single page, including some (up to 56 byte) malloc header
+struct transaction_log_chunk {
+    struct transaction_log_chunk *next_chunk;
+    int num_used;
+    int filler;  // padding to give it 8 byte boundary
+    struct transaction_log_entry entries[TX_LOG_ENTRIES_PER_CHUNK];
+};
+
+// global variables
+struct current_transaction {
+    int number_of_changes;
+    int modes;
+    long transaction_ref;       // system change no
+    struct transaction_log_chunk *logs;
+} current_transaction = {
+    0, 0, 0, 0, 0L, NULL
+};
+static jclass javaMapClass;
 static jfieldID fidNumber;
+
 
 // reference: see http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
 
@@ -39,21 +86,48 @@ void throwAny(JNIEnv *env, char *msg) {
     (*env)->ThrowNew(env, exceptionCls, msg);
 }
 
+// transactions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+ * Class:     Java_de_jpaw_offHeap_OffHeapTransaction_natInit
+ * Method:    natInit
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natInit(JNIEnv *env, jobject me) {
+    javaMapClass = (*env)->NewGlobalRef(env, (*env)->GetObjectClass(env, me)); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
+
+    // Get the Field ID of the instance variables "number"
+    fidNumber = (*env)->GetFieldID(env, javaMapClass, "cStruct", "J");
+    if (!fidNumber) {
+        throwAny(env, "Invoking class must have a field long cStruct");
+        return;
+    }
+}
+
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natOpen
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JNIEnv *env, jobject me, jint size) {
-    thisClass = (*env)->NewGlobalRef(env, (*env)->GetObjectClass(env, me)); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
-
-    // Get the Field ID of the instance variables "number"
-    fidNumber = (*env)->GetFieldID(env, thisClass, "cStruct", "J");
-    if (!fidNumber) {
-        throwAny(env, "Invoking class must have a field long cStruct");
-        return;
-    }
-
     // round up the size to multiples of 32, for the collision indicator
     size = ((size - 1) | 31) + 1;
     struct map *mapdata = malloc(sizeof(struct map));
@@ -61,8 +135,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JN
         throwOutOfMemory(env);
         return;
     }
-    mapdata->currentEntries = 0;
-    mapdata->maxEntries = size;
+    mapdata->hashTableSize = size;
     mapdata->data = calloc(size, sizeof(struct entry *));
     if (!mapdata->data) {
         throwOutOfMemory(env);
@@ -100,12 +173,13 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(J
     // Get the int given the Field ID
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
     // printf("jpawMap: closing map at %p\n", mapdata);
-    clear(mapdata->data, mapdata->maxEntries);
+    clear(mapdata->data, mapdata->hashTableSize);
     free(mapdata->data);
     free(mapdata);
     (*env)->SetLongField(env, me, fidNumber, (jlong) 0);
-    (*env)->DeleteGlobalRef(env, thisClass);
-    thisClass = NULL;
+    // do not delete it, it could be usedby other maps
+//    (*env)->DeleteGlobalRef(env, javaMapClass);
+//    javaMapClass = NULL;
 }
 
 /*
@@ -116,8 +190,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(J
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(JNIEnv *env, jobject me) {
     // Get the int given the Field ID
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
-    clear(mapdata->data, mapdata->maxEntries);
-    memset(mapdata->data, 0, mapdata->maxEntries * sizeof(struct entry *));     // set the initial pointers to NULL
+    clear(mapdata->data, mapdata->hashTableSize);
+    memset(mapdata->data, 0, mapdata->hashTableSize * sizeof(struct entry *));     // set the initial pointers to NULL
 }
 
 static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
@@ -144,7 +218,7 @@ static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
 
 
 struct entry *find_entry(struct map *mapdata, long key) {
-    int hash = computeHash(key, mapdata->maxEntries);
+    int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *e = mapdata->data[hash];
     while (e) {
         // check if this is a match
@@ -183,7 +257,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong key) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
-    int hash = computeHash(key, mapdata->maxEntries);
+    int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *prev = NULL;
     struct entry *e = mapdata->data[hash];
     while (e) {
@@ -212,7 +286,7 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRem
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetAndRemove(JNIEnv *env, jobject me, jlong key) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
-    int hash = computeHash(key, mapdata->maxEntries);
+    int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *prev = NULL;
     struct entry *e = mapdata->data[hash];
     while (e) {
@@ -275,7 +349,7 @@ struct entry *create_new_entry(JNIEnv *env, jbyteArray data, jboolean doCompress
 
 struct entry * setPutSub(JNIEnv *env, jobject me, jlong key, jbyteArray data, jboolean doCompress) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
-    int hash = computeHash(key, mapdata->maxEntries);
+    int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *newEntry = create_new_entry(env, data, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
@@ -333,4 +407,42 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natP
         return result;
     }
     return NULL;
+}
+
+
+int computeChainLength(struct entry *e) {
+    register int len = 0;
+    while (e) {
+        ++len;
+        e = e->nextSameHash;
+    }
+    return len;
+}
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetHistogram
+ * Signature: ([I)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHistogram
+  (JNIEnv *env, jobject me, jintArray histogram) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, fidNumber));
+    int maxLen = 0;
+    int numHistogramEntries = (*env)->GetArrayLength(env, histogram);
+    int *ctr = calloc(numHistogramEntries, sizeof(int));
+    if (!ctr) {
+        throwOutOfMemory(env);
+        return -1;
+    }
+    int i;
+    for (i = 0; i < mapdata->hashTableSize; ++i) {
+        int len = computeChainLength(mapdata->data[i]);
+        if (len > maxLen)
+            maxLen = len;
+        if (len < numHistogramEntries)
+            ++ctr[len];
+    }
+    (*env)->SetIntArrayRegion(env, histogram, 0, numHistogramEntries, (jint *)ctr);
+    free(ctr);
+    return maxLen;
 }

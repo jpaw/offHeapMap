@@ -9,6 +9,14 @@ extern "C" {
 #endif
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natInit
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natInit
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natOpen
  * Signature: (I)V
  */
@@ -86,6 +94,57 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSto
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut
   (JNIEnv *, jobject, jlong, jbyteArray, jboolean);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetHistogram
+ * Signature: ([I)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHistogram
+  (JNIEnv *, jobject, jintArray);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
+/* Header for class de_jpaw_offHeap_OffHeapTransaction */
+
+#ifndef _Included_de_jpaw_offHeap_OffHeapTransaction
+#define _Included_de_jpaw_offHeap_OffHeapTransaction
+#ifdef __cplusplus
+extern "C" {
+#endif
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natStartTransaction
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natStartTransaction
+  (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natCommit
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natRollback
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
+  (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natSetSafepoint
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
+  (JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }

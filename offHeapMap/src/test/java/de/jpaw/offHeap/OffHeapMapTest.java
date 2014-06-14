@@ -75,6 +75,10 @@ public class OffHeapMapTest {
             assert(Arrays.equals(data, myMem.get(i)));
         }
         System.out.println("Compare test successful");
+        
+        // also display the histogram
+        myMap.printHistogram(10, null);
+        
         myMap.close();
     }
 

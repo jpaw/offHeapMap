@@ -89,6 +89,7 @@
                                     <arg value="${project.build.outputDirectory}" />
                                     <arg value="-force" />
                                     <arg value="de.jpaw.offHeap.LongToByteArrayOffHeapMap" />
+                                    <arg value="de.jpaw.offHeap.OffHeapTransaction" />
                                 </exec>
 
                                 <exec executable="make" ></exec>
