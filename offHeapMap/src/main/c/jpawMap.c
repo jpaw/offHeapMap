@@ -452,7 +452,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
 }
 
 
-struct entry *create_new_entry(JNIEnv *env, jbyteArray data, jboolean doCompress) {
+struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean doCompress) {
     int uncompressed_length = (*env)->GetArrayLength(env, data);
     struct entry *e;
     if (doCompress) {
@@ -486,6 +486,7 @@ struct entry *create_new_entry(JNIEnv *env, jbyteArray data, jboolean doCompress
         e->compressedSize = 0;
         (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)e->data);
     }
+    e->key = key;
     return e;
 }
 
@@ -524,7 +525,7 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet(
         JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jboolean doCompress) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    struct entry *newEntry = create_new_entry(env, data, doCompress);
+    struct entry *newEntry = create_new_entry(env, key, data, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
         return JNI_FALSE;
@@ -542,7 +543,7 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut(JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jboolean doCompress) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    struct entry *newEntry = create_new_entry(env, data, doCompress);
+    struct entry *newEntry = create_new_entry(env, key, data, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
         return NULL;
