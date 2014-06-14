@@ -18,10 +18,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natInit
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natOpen
- * Signature: (I)V
+ * Signature: (II)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen
-  (JNIEnv *, jobject, jint);
+  (JNIEnv *, jobject, jint, jint);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
@@ -42,10 +42,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natRemove
- * Signature: (J)Z
+ * Signature: (JJ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
@@ -66,34 +66,34 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natGetAndRemove
- * Signature: (J)[B
+ * Signature: (JJ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetAndRemove
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natSet
- * Signature: (J[BZ)Z
+ * Signature: (JJ[BZ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet
-  (JNIEnv *, jobject, jlong, jbyteArray, jboolean);
+  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natStoreRegion
- * Signature: (J[BIIZ)Z
+ * Signature: (JJ[BIIZ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natStoreRegion
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jint, jboolean);
+  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jint, jint, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natPut
- * Signature: (J[BZ)[B
+ * Signature: (JJ[BZ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut
-  (JNIEnv *, jobject, jlong, jbyteArray, jboolean);
+  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
@@ -116,19 +116,35 @@ extern "C" {
 #endif
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natStartTransaction
- * Signature: (JI)V
+ * Method:    natInit
+ * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natStartTransaction
-  (JNIEnv *, jobject, jlong, jint);
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natInit
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natCreateTransaction
+ * Signature: (I)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransaction
+  (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natSetMode
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
+  (JNIEnv *, jobject, jint);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: ()I
+ * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
@@ -144,6 +160,14 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natCloseTransaction
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

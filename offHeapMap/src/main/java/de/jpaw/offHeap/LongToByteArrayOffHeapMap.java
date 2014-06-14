@@ -13,6 +13,8 @@ public class LongToByteArrayOffHeapMap {
      */
     private static Boolean isInitialized = Boolean.FALSE;
     
+    private final Shard myShard;
+    
     /** Only used by native code, to store the off heap address of the structure. */
     private long cStruct = 0L;
     
@@ -35,7 +37,7 @@ public class LongToByteArrayOffHeapMap {
     /** Allocates and initializes a new data structure for the given maximum number of elements.
      * Stores the resulting off heap location in the private field cStruct.
      */
-    private native void natOpen(int size);
+    private native void natOpen(int size, int modes);
     
     /** Closes the map (clears the map and all entries it from memory).
      * After close() has been called, the object should not be used any more. */
@@ -45,7 +47,7 @@ public class LongToByteArrayOffHeapMap {
     private native void natClear();
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
-    private native boolean natRemove(long key);
+    private native boolean natRemove(long ctx, long key);
     
     /** Returns the (uncompressed) size of the data stored for key, or -1 if null / no entry is stored for key. */
     private native int natLength(long key);
@@ -55,19 +57,19 @@ public class LongToByteArrayOffHeapMap {
     
     /** Read an entry and return it in uncompressed form, then deletes it from the structure.
      *  Returns null if no entry is present for the specified key. */
-    private native byte [] natGetAndRemove(long key);
+    private native byte [] natGetAndRemove(long ctx, long key);
     
     /** Stores an entry in the map. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
      * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
-    private native boolean natSet(long key, byte [] data, boolean doCompress);
+    private native boolean natSet(long ctx, long key, byte [] data, boolean doCompress);
     
     /** Stores an entry in the map, specified by a region within some data. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
      * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
-    private native boolean natStoreRegion(long key, byte [] data, int offset, int length, boolean doCompress);
+    private native boolean natStoreRegion(long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     /** Stores an entry in the map and returns the previous entry, or null if there was no prior entry for this key.
      * data may not be null (use get(key) for that purpose). */
-    private native byte [] natPut(long key, byte [] data, boolean doCompress);
+    private native byte [] natPut(long ctx, long key, byte [] data, boolean doCompress);
     
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
      * Chains of bigger length are not counted. The method returns the longest chain length. */
@@ -85,19 +87,25 @@ public class LongToByteArrayOffHeapMap {
         return data.length > maxUncompressedSize;
     }
     
-    public LongToByteArrayOffHeapMap(int size) {
+    public LongToByteArrayOffHeapMap(int size, Shard forShard, int modes) {
+        myShard = forShard; 
         synchronized (isInitialized) {
             if (!isInitialized) {
-                System.loadLibrary("lz4");      // Load native library at runtime
-                System.loadLibrary("jpawMap");  // Load native library at runtime
+                OffHeapTransaction.init();
                 natInit();
                 // now we are (unless an Exception was thrown)
                 isInitialized = Boolean.TRUE;
             }
         }
-        natOpen(size);
+        natOpen(size, modes);
     }
-
+    public LongToByteArrayOffHeapMap(int size, Shard forShard) {
+        this(size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, -1);
+    }
+    public LongToByteArrayOffHeapMap(int size) {
+        this(size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, 0);
+    }
+    
     /** Returns the number of entries currently in the map. */
     public int size() {
         return currentSize;
@@ -129,13 +137,15 @@ public class LongToByteArrayOffHeapMap {
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
     public void clear() {
+        if (myShard != Shard.TRANSACTIONLESS_DEFAULT_SHARD)
+            throw new RuntimeException("clear() only possible for maps of the transactionless default shard");
         natClear();
         currentSize = 0;
     }
 
     /** Removes the entry stored for key from the map (if it did exist). */
     public void remove(long key) {
-        if (natRemove(key))
+        if (natRemove(myShard.getTxCStruct(), key))
             --currentSize;
     }
     
@@ -161,7 +171,7 @@ public class LongToByteArrayOffHeapMap {
         if (data == null) {
             remove(key);
         } else {
-            if (natSet(key, data, shouldICompressThis(data)))
+            if (natSet(myShard.getTxCStruct(), key, data, shouldICompressThis(data)))
                 ++currentSize;
         }
     }
@@ -170,12 +180,12 @@ public class LongToByteArrayOffHeapMap {
      * Deleting an entry can be done by passing null as the data pointer. */
     public byte [] put(long key, byte [] data) {
         if (data == null) {
-            byte [] result = natGetAndRemove(key);
+            byte [] result = natGetAndRemove(myShard.getTxCStruct(), key);
             if (result != null)
                 --currentSize;
             return result;
         } else {
-            byte [] result = natPut(key, data, shouldICompressThis(data));
+            byte [] result = natPut(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
             if (result == null)
                 ++currentSize;
             return result;
@@ -189,7 +199,7 @@ public class LongToByteArrayOffHeapMap {
     public void storeRegion(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        if (natStoreRegion(key, data, offset, length, shouldICompressThis(data))) {
+        if (natStoreRegion(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data))) {
             ++currentSize;
         }
     }
