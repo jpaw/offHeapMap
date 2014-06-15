@@ -5,7 +5,8 @@
 #include <lz4.h>
 #include "jpawMap.h"
 
-#define USE_CRITICAL
+#define USE_CRITICAL_FOR_STORE
+#define USE_CRITICAL_FOR_RETRIEVAL
 
 #undef SEPARATE_COMMITTED_VIEW
 
@@ -425,6 +426,17 @@ static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
         (*env)->SetByteArrayRegion(env, result, 0, e->uncompressedSize, (jbyte *)e->data);
     } else {
         // uncompress it
+#ifdef USE_CRITICAL_FOR_RETRIEVAL
+        jboolean isCopy = 0;
+        void *tmp = (*env)->GetPrimitiveArrayCritical(env, result, &isCopy);
+        if (!tmp) {
+            throwOutOfMemory(env);
+            // TODO: release result?
+            return result;
+        }
+        LZ4_decompress_fast(e->data, tmp, e->uncompressedSize);
+        (*env)->ReleasePrimitiveArrayCritical(env, result, tmp, 0);  // transfer back data and release tmp buffer
+#else
         // TODO: can the temporary buffer be avoided, i.e. we write directly into the jbyteArray buffer? It would skip 1 malloc / free plus an array copy
         char *tmp = malloc(e->uncompressedSize);
         if (!tmp) {
@@ -435,6 +447,7 @@ static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
         LZ4_decompress_fast(e->data, tmp, e->uncompressedSize);
         (*env)->SetByteArrayRegion(env, result, 0, e->uncompressedSize, (jbyte *)tmp);
         free(tmp);
+#endif
     }
     return result;
 }
@@ -563,7 +576,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
         if (!tmp_dst) {
             return NULL;  // will throw OOM
         }
-#ifndef USE_CRITICAL
+#ifndef USE_CRITICAL_FOR_STORE
         void *tmp_src = malloc(uncompressed_length);
         if (!tmp_src) {
             free(tmp_dst);
@@ -576,6 +589,11 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
         // get the original array location, to avoid an extra copy
         jboolean isCopy = 0;
         void *src = (*env)->GetPrimitiveArrayCritical(env, data, &isCopy);
+        if (!src) {
+            throwOutOfMemory(env);
+            // TODO: release result?
+            return NULL;
+        }
         int actual_compressed_length = LZ4_compress(src, tmp_dst->data, uncompressed_length);
         (*env)->ReleasePrimitiveArrayCritical(env, data, src, JNI_ABORT);  // abort, as we did not change anything
 #endif
