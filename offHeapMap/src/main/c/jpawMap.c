@@ -22,6 +22,8 @@ struct entry {
 struct map {
     int hashTableSize;
     int modes;
+    int count;              // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
+    int padding;
     struct entry **data;
 #ifdef SEPARATE_COMMITTED_VIEW
     struct entry **committedViewData;
@@ -58,9 +60,6 @@ struct tx_log_hdr {
     int number_of_changes;
     int modes;
     struct tx_log_list *chunks[TX_LOG_ENTRIES_PER_CHUNK_LV1];
-//    long transaction_ref;       // system change no => set during commit()
-//    struct tx_log_list *logsFirst;
-//    struct tx_log_list *logsLast;
 };
 static jclass javaTxClass;
 static jfieldID javaTxCStructFID;
@@ -124,10 +123,30 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
     memset(hdr, 0, sizeof(struct tx_log_hdr));
     hdr->modes = mode;
     hdr->number_of_changes = 0;
-//    hdr->logsFirst = NULL;
-//    hdr->logsLast = NULL;
     return (jlong)hdr;
 }
+
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natCloseTransaction
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
+  (JNIEnv *env, jobject me) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+    if (hdr->number_of_changes) {
+        throwAny(env, "Cannot close within pending transaction");
+        return;
+    }
+    // free redo blocks
+    int i = 0;
+    while (i < TX_LOG_ENTRIES_PER_CHUNK_LV1 && hdr->chunks[i])
+        free(hdr->chunks[i]);
+    free(hdr);
+    (*env)->SetLongField(env, me, javaTxCStructFID, (jlong)0);
+}
+
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
@@ -144,6 +163,16 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
     hdr->modes = mode;
 }
 
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natSetSafepoint
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
+  (JNIEnv *env, jobject me) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+    return hdr->number_of_changes;
+}
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
@@ -176,16 +205,19 @@ void rollback(struct tx_log_entry *e) {
     if (!e->old_entry) {
         // was an insert
         execRemove(NULL, e->affected_table, e->old_entry->key); // TODO: assert new entry was returned
+        free(e->new_entry);
     } else {
         // replace or delete
         struct entry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);  // TODO: assert we got the new entry (NULL or not)
+        if (e->new_entry)
+            free(e->new_entry);
     }
 }
 
 
 /** Record a row change. Returns an error if anything went wrong. */
 char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *oldData, struct entry *newData) {
-    if (!ctx || !mapdata->modes) {
+    if (!ctx || mapdata->modes == 0 || !ctx->modes) {
         // no transaction log. Maybe free old data
         if (oldData)
             free(oldData);
@@ -273,6 +305,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JN
     mapdata->hashTableSize = size;
     mapdata->modes = mode;
     mapdata->data = calloc(size, sizeof(struct entry *));
+    mapdata->count = 0;
+    mapdata->padding = 0;
     if (!mapdata->data) {
         throwOutOfMemory(env);
         return;
@@ -318,6 +352,19 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(J
 //    javaMapClass = NULL;
 }
 
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetSize
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetSize
+  (JNIEnv *env, jobject me) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+    return mapdata->count;
+}
+
+
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natClear
@@ -328,6 +375,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(J
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
     clear(mapdata->data, mapdata->hashTableSize);
     memset(mapdata->data, 0, mapdata->hashTableSize * sizeof(struct entry *));     // set the initial pointers to NULL
+    mapdata->count = 0;
 }
 
 static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
@@ -403,11 +451,13 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
                 prev->nextSameHash = e->nextSameHash;
             }
             record_change(ctx, mapdata, e, NULL);
+            --mapdata->count;
             return JNI_TRUE;
         }
         prev = e;
         e = e->nextSameHash;
     }
+    // not found. No change of size
     return JNI_FALSE;
 }
 
@@ -443,6 +493,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
             }
             jbyteArray result = toJavaByteArray(env, e);
             record_change((struct tx_log_hdr *)ctx, mapdata, e, NULL);
+            --mapdata->count;
             return result;
         }
         prev = e;
@@ -513,6 +564,7 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
         e = e->nextSameHash;
     }
     // this is a new entry
+    ++mapdata->count;
     return NULL;
 }
 

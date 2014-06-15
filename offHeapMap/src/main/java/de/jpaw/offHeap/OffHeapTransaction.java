@@ -64,7 +64,7 @@ public class OffHeapTransaction {
     private int rowsChanged = 0;
     
     
-    private OffHeapTransaction(int initialMode) {
+    public OffHeapTransaction(int initialMode) {
         currentMode = initialMode;
 //        if (myId >= MAX_TRANSACTIONS)
 //            throw new RuntimeException("Too many transactions created. Transactions should be long term resources");

@@ -43,7 +43,7 @@ public class OffHeapMapTest {
         
         assert(myMap.get(KEY - 1L) == null);
         assert(myMap.get(KEY + 1L) == null);
-        myMap.printHistogram(2, null);
+        // myMap.printHistogram(2, null);
         assert(myMap.get(KEY) != null);
         byte [] newData = myMap.get(KEY);
         assert(newData.length == oldData.length);
@@ -78,7 +78,7 @@ public class OffHeapMapTest {
         System.out.println("Compare test successful");
         
         // also display the histogram
-        myMap.printHistogram(10, null);
+        myMap.printHistogram(5, null);
         
         myMap.close();
     }
