@@ -34,6 +34,7 @@ public class TransactionsTest {
         doAssert(myMap, null);
        
         myMap.close();
+        tx1.close();
     }
     
     public void runTx2Test() throws Exception {
@@ -50,5 +51,6 @@ public class TransactionsTest {
         doAssert(myMap, b1);
        
         myMap.close();
+        tx1.close();
     }
 }

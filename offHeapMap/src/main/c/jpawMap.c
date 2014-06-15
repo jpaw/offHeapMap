@@ -7,6 +7,8 @@
 
 #undef SEPARATE_COMMITTED_VIEW
 
+#undef DEBUG
+//#define DEBUG
 
 struct entry {
     int uncompressedSize;
@@ -123,6 +125,9 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
     memset(hdr, 0, sizeof(struct tx_log_hdr));
     hdr->modes = mode;
     hdr->number_of_changes = 0;
+#ifdef DEBUG
+    fprintf(stderr, "CREATE TRANSACTION\n");
+#endif
     return (jlong)hdr;
 }
 
@@ -140,11 +145,15 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransacti
         return;
     }
     // free redo blocks
-    int i = 0;
-    while (i < TX_LOG_ENTRIES_PER_CHUNK_LV1 && hdr->chunks[i])
+    int i;
+    for (i = 0; i < TX_LOG_ENTRIES_PER_CHUNK_LV1 && hdr->chunks[i]; ++i) {
         free(hdr->chunks[i]);
+    }
     free(hdr);
     (*env)->SetLongField(env, me, javaTxCStructFID, (jlong)0);
+#ifdef DEBUG
+    fprintf(stderr, "CLOSE TRANSACTION\n");
+#endif
 }
 
 
@@ -182,6 +191,9 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
   (JNIEnv *env, jobject me, jlong ref) {
     // currently no redo logs are written. Therefore just discard the entries
+#ifdef DEBUG
+    fprintf(stderr, "COMMIT START\n");
+#endif
     struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
     int currentEntries = hdr->number_of_changes;
     if (currentEntries) {
@@ -198,17 +210,33 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
         }
     }
     hdr->number_of_changes = 0;
+#ifdef DEBUG
+    fprintf(stderr, "COMMIT END\n");
+#endif
     return currentEntries;
 }
 
 void rollback(struct tx_log_entry *e) {
+#ifdef DEBUG
+    fprintf(stderr, "Rolling back entry for %016p %016p %016p\n", e->affected_table, e->old_entry, e->new_entry);
+#endif
     if (!e->old_entry) {
         // was an insert
-        execRemove(NULL, e->affected_table, e->old_entry->key); // TODO: assert new entry was returned
-        free(e->new_entry);
+#ifdef DEBUG
+        fprintf(stderr, "    => remove key %ld\n", e->new_entry->key);
+#endif
+        execRemove(NULL, e->affected_table, e->new_entry->key); // TODO: assert new entry was returned
+        // as old_entry was null, new_entry is definitely not null and must be deallocated
+        // free(e->new_entry);  // but this was done within execRenove already!
     } else {
         // replace or delete
+#ifdef DEBUG
+        fprintf(stderr, "    => insert / update %016p with key %ld\n", e->old_entry, e->old_entry->key);
+#endif
         struct entry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);  // TODO: assert we got the new entry (NULL or not)
+        if (shouldBeNew != e->new_entry)
+            fprintf(stderr, "ROLLBACK PROBLEM: expected to get %016p, but got %016p for key %ld\n", e->new_entry, shouldBeNew, e->old_entry->key);
+        // if new_entry was not null, then free it (it is no longer required)
         if (e->new_entry)
             free(e->new_entry);
     }
@@ -235,11 +263,14 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
             return "Out of memory recording rollback info";
         ctx->chunks[chunkIndex] = chunk;
     }
-    struct tx_log_entry *loge = &(chunk->entries[chunkIndex & 0xff]);
+    struct tx_log_entry *loge = &(chunk->entries[ctx->number_of_changes & 0xff]);
+#ifdef DEBUG
+    fprintf(stderr, "Storing rollback data at %016p: map=%016p old=%016p new=%016p\n", loge, mapdata, oldData, newData);
+#endif
     loge->affected_table = mapdata;
     loge->old_entry = oldData;
     loge->new_entry = newData;
-    ++ctx->number_of_changes;
+    ++(ctx->number_of_changes);
     return NULL;
 }
 
@@ -251,6 +282,9 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
   (JNIEnv *env, jobject me, jint rollbackTo) {
+#ifdef DEBUG
+    fprintf(stderr, "ROLLBACK START (%d)\n", rollbackTo);
+#endif
     struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
     int currentEntries = hdr->number_of_changes;
     if (currentEntries > rollbackTo) {
@@ -263,6 +297,9 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
         }
         hdr->number_of_changes = rollbackTo;
     }
+#ifdef DEBUG
+    fprintf(stderr, "ROLLBACK END\n");
+#endif
 }
 
 
@@ -436,7 +473,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(
 
 
 
-
+// remove an entry for a key. If transactions are active, redo log / rollback info will be stored. Else the entry no longer required will be freed.
 jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *prev = NULL;
