@@ -65,6 +65,14 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natCompressedLength
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natCompressedLength
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natGet
  * Signature: (J)[B
  */

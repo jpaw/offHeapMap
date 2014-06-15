@@ -1,5 +1,6 @@
 package de.jpaw.jni.bench;
 
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeUnit;
 
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -34,25 +35,51 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx               avgt         9       11.608        1.355    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx             avgt         9       12.087        1.318    ns/op
 
+//Benchmark                                               Mode   Samples         Mean   Mean error    Units
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp            avgt         9       20.295        0.918    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                      avgt         9       20.317        0.450    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx     avgt         9      447.336        2.338    ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt         9       98.523        0.891    ns/op
+//
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp              avgt         9       20.214        1.779    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                        avgt         9       19.881        0.498    ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                 avgt         9      163.259       15.927    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx       avgt         9     1184.993       19.434    ns/op
+//
+// => compression speed is about 700 ns / KB => 1.3 GB / s
+
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(value = Scope.Thread)
 public class OffHeapMapBench {
+    static public final String TEXT = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet";
     private static final long KEY = 552528219827L;
+    private static final long KEY_PERM_SMALL = 552528219828L;
+    private static final long KEY_PERM_1KB = 552528219829L;
     private static final long CHANGE_ID = 553428219827L;
     private static final byte [] SHORTDATA = { (byte)1, (byte)2, (byte)3 };
     
     private LongToByteArrayOffHeapMap mapNoTransactions = null;
+    private LongToByteArrayOffHeapMap mapNoTransactionsComp = null;
     private LongToByteArrayOffHeapMap mapWithTransactions = null;
     private Shard defaultShard = new Shard();
     private OffHeapTransaction transaction = null;
+    private byte [] data1KB = null;
     
     @Setup
-    public void setUp() {
+    public void setUp() throws UnsupportedEncodingException {
         mapNoTransactions = new LongToByteArrayOffHeapMap(1000);
+        mapNoTransactionsComp = new LongToByteArrayOffHeapMap(1000);
+        mapNoTransactionsComp.setMaxUncompressedSize(1);
         mapWithTransactions = new LongToByteArrayOffHeapMap(1000, defaultShard);
         transaction = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
         defaultShard.setOwningTransaction(transaction);
+        data1KB = (TEXT + TEXT + TEXT + TEXT).substring(0, 1024).getBytes("UTF-8");
+        
+        mapNoTransactions.set(KEY_PERM_SMALL, SHORTDATA);
+        mapNoTransactions.set(KEY_PERM_1KB, data1KB);
+        mapNoTransactionsComp.set(KEY_PERM_SMALL, SHORTDATA);
+        mapNoTransactionsComp.set(KEY_PERM_1KB, data1KB);
     }
 
     @TearDown
@@ -78,11 +105,52 @@ public class OffHeapMapBench {
         transaction.commit(CHANGE_ID);
     }
 
+    
+    
     @GenerateMicroBenchmark
-    public void insertOpNoTx() {
+    public void insertSmallOpNoTx() {
         mapNoTransactions.set(KEY, SHORTDATA);
     }
 
+    @GenerateMicroBenchmark
+    public void insert1KBOpNoTx() {
+        mapNoTransactions.set(KEY, data1KB);
+    }
+
+    @GenerateMicroBenchmark
+    public void insertCompressedSmallOpNoTx() {
+        mapNoTransactionsComp.set(KEY, SHORTDATA);
+    }
+
+    @GenerateMicroBenchmark
+    public void insertCompressed1KBOpNoTx() {
+        mapNoTransactionsComp.set(KEY, data1KB);
+    }
+
+
+    
+    @GenerateMicroBenchmark
+    public void getSmallOp(BlackHole bh) {
+        bh.consume(mapNoTransactions.get(KEY_PERM_SMALL));
+    }
+    
+    @GenerateMicroBenchmark
+    public void get1KBOp(BlackHole bh) {
+        bh.consume(mapNoTransactions.get(KEY_PERM_1KB));
+    }
+    
+    @GenerateMicroBenchmark
+    public void getSmallCompressedOp(BlackHole bh) {
+        bh.consume(mapNoTransactionsComp.get(KEY_PERM_SMALL));
+    }
+    
+    @GenerateMicroBenchmark
+    public void get1KBCompressedOp(BlackHole bh) {
+        bh.consume(mapNoTransactionsComp.get(KEY_PERM_1KB));
+    }
+
+
+    
     @GenerateMicroBenchmark
     public void insertGetOpNoTx(BlackHole bh) {
         mapNoTransactions.set(KEY, SHORTDATA);

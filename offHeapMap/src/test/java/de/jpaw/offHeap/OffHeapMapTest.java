@@ -52,9 +52,40 @@ public class OffHeapMapTest {
         System.out.println(newText);
         assert(Arrays.equals(newData, oldData));
         
+        // check lengths
+        int len = myMap.length(KEY);
+        assert(len == oldData.length);
+        
+        int compressedLen = myMap.compressedLength(KEY);
+        assert(compressedLen < len);  // well, given this text, it should be! This is not valid for any input data, though
+        System.out.println("Original length = " + len + ", compressed length = " + compressedLen + ", ratio = " + (100.0 * (float)compressedLen / (float)len));
+        
         myMap.close();
     }
 
+
+    public void runStoreRetrieveTestCompressedLongtext() {
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
+        myMap.setMaxUncompressedSize(0);
+        byte [] oldData = (TEXT+TEXT+TEXT+TEXT).getBytes();
+        myMap.set(KEY, oldData);
+        
+        byte [] newData = myMap.get(KEY);
+        assert(newData != null);
+        assert(newData.length == oldData.length);
+        assert(Arrays.equals(newData, oldData));
+        
+        // check lengths
+        int len = myMap.length(KEY);
+        assert(len == oldData.length);
+        
+        int compressedLen = myMap.compressedLength(KEY);
+        assert(compressedLen < len);  // well, given this text, it should be! This is not valid for any input data, though
+        System.out.println("Original length = " + len + ", compressed length = " + compressedLen + ", ratio = " + (100.0 * (float)compressedLen / (float)len));
+        
+        myMap.close();
+    }
+    
     public void runStoreRetrieveTestCompressedWithVerify() {
         final int HASH_SIZE = 10000;
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(HASH_SIZE);

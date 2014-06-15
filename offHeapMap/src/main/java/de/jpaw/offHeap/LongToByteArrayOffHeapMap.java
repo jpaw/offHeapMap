@@ -56,6 +56,9 @@ public class LongToByteArrayOffHeapMap {
     /** Returns the (uncompressed) size of the data stored for key, or -1 if null / no entry is stored for key. */
     private native int natLength(long key);
     
+    /** Returns the compressed size of a stored entry, or -1 if no entry is stored, or 0 if the data is not compressed. */
+    private native int natCompressedLength(long key);
+    
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
     private native byte [] natGet(long key);
     
@@ -163,6 +166,11 @@ public class LongToByteArrayOffHeapMap {
     /** Returns the length of a stored entry, or -1 if no entry is stored. */
     public int length(long key) {
         return natLength(key);
+    }
+    
+    /** Returns the compressed size of a stored entry, or -1 if no entry is stored, or 0 if the data is not compressed. */
+    public int compressedLength(long key) {
+        return natCompressedLength(key);
     }
     
     /** Stores an entry in the map.

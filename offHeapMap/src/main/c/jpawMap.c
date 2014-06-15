@@ -5,6 +5,8 @@
 #include <lz4.h>
 #include "jpawMap.h"
 
+#define USE_CRITICAL
+
 #undef SEPARATE_COMMITTED_VIEW
 
 #undef DEBUG
@@ -471,6 +473,17 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(
     return (jint)(e ? e->uncompressedSize : -1);
 }
 
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natCompressedLength
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natCompressedLength(JNIEnv *env, jobject me, jlong key) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+    struct entry *e = find_entry(mapdata, key);
+    return (jint)(e ? e->compressedSize : -1);
+}
+
 
 
 // remove an entry for a key. If transactions are active, redo log / rollback info will be stored. Else the entry no longer required will be freed.
@@ -544,28 +557,40 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
     int uncompressed_length = (*env)->GetArrayLength(env, data);
     struct entry *e;
     if (doCompress) {
-        // compress the data
-        char *tmp_src = malloc(uncompressed_length);
-        if (!tmp_src)
-            return NULL;  // will throw OOM
-        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)tmp_src);
-        int tmp_length = LZ4_compressBound(uncompressed_length);
-        char *tmp_dst = malloc(tmp_length);
+        // compress the data. Allocate a target buffer
+        int max_compressed_length = round_up_size(LZ4_compressBound(uncompressed_length));
+        struct entry *tmp_dst = malloc(sizeof(struct entry) + max_compressed_length);
         if (!tmp_dst) {
-            free(tmp_src);
             return NULL;  // will throw OOM
         }
-        int actual_compressed_length = LZ4_compress(tmp_src, tmp_dst, uncompressed_length);
-        free(tmp_src);
-        e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(actual_compressed_length));
-        if (!e) {
+#ifndef USE_CRITICAL
+        void *tmp_src = malloc(uncompressed_length);
+        if (!tmp_src) {
             free(tmp_dst);
             return NULL;  // will throw OOM
         }
+        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, tmp_src);
+        int actual_compressed_length = LZ4_compress(tmp_src, tmp_dst->data, uncompressed_length);
+        free(tmp_src);
+#else
+        // get the original array location, to avoid an extra copy
+        jboolean isCopy = 0;
+        void *src = (*env)->GetPrimitiveArrayCritical(env, data, &isCopy);
+        int actual_compressed_length = LZ4_compress(src, tmp_dst->data, uncompressed_length);
+        (*env)->ReleasePrimitiveArrayCritical(env, data, src, JNI_ABORT);  // abort, as we did not change anything
+#endif
+        // TODO: if the uncompressed size needs the same space (or less) than the compressed, use the uncompressed form instead!
+        int actual_rounded_length = round_up_size(actual_compressed_length);
+        // if we need less than initially allocated, realloc to free the space.
+        if (actual_rounded_length < max_compressed_length) {
+            e = realloc(tmp_dst, sizeof(struct entry) + actual_rounded_length);
+            if (!e)
+                e = tmp_dst;
+        } else {
+            e = tmp_dst;
+        }
         e->uncompressedSize = uncompressed_length;
         e->compressedSize = actual_compressed_length;
-        memcpy(e->data, tmp_dst, actual_compressed_length);
-        free(tmp_dst);
     } else {
         e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(uncompressed_length));
         if (!e)
