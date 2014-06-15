@@ -22,7 +22,11 @@ Being a simple key / value store, the implementation is agnostic of the contents
 
 ## Limitations
 
-The build files run on Linux / gcc only. No effort has been spent to make the build portable. As mentioned above, it serves mainly as a feasibility study.
+The build files run on Linux / gcc 64 bit only, using Oracle's 64 bit JDK8. No effort has been spent to make the build portable. As mentioned above, it serves mainly as a feasibility study.
+
+All native libraries are assumed to reside within the lib subdirectory of the user's home directory.
+
+The build files assume Eclipse 4.4 LUNA with CDT.
 
 All classes are non-threadsafe. Following ideas of the LMAX disruptor (http://lmax-exchange.github.io/disruptor/), you can operate
 single-threaded as long as you're fast enough. You can however create multiple independent transactions.
