@@ -49,6 +49,14 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRem
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetSize
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetSize
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natLength
  * Signature: (J)I
  */

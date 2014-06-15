@@ -18,8 +18,9 @@ public class LongToByteArrayOffHeapMap {
     /** Only used by native code, to store the off heap address of the structure. */
     private long cStruct = 0L;
     
-    /** The current number of elements inside the offheap storage. Identical meaning to java.util.Map.size(). */
-    private int currentSize = 0;
+    /** The current number of elements inside the offheap storage. Identical meaning to java.util.Map.size().
+     * Only valid for non-transactional maps. */
+//    private int currentSize = 0;
     
     /** The threshold at which entries stored should be automatically compressed, in bytes.
      * Setting it to Integer.MAX_VALUE will disable compression. Setting it to 0 will perform compression for all (non-zero-length) items. */
@@ -48,6 +49,9 @@ public class LongToByteArrayOffHeapMap {
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
     private native boolean natRemove(long ctx, long key);
+    
+    /** Returns the number of entries in the JNI data structure. */
+    private native int natGetSize();
     
     /** Returns the (uncompressed) size of the data stored for key, or -1 if null / no entry is stored for key. */
     private native int natLength(long key);
@@ -108,7 +112,7 @@ public class LongToByteArrayOffHeapMap {
     
     /** Returns the number of entries currently in the map. */
     public int size() {
-        return currentSize;
+        return natGetSize();
     }
     
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
@@ -132,7 +136,6 @@ public class LongToByteArrayOffHeapMap {
      * After close() has been called, the object should not be used any more. */
     public void close() {
         natClose();
-        currentSize = 0;
     }
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
@@ -140,13 +143,11 @@ public class LongToByteArrayOffHeapMap {
         if (myShard != Shard.TRANSACTIONLESS_DEFAULT_SHARD)
             throw new RuntimeException("clear() only possible for maps of the transactionless default shard");
         natClear();
-        currentSize = 0;
     }
 
     /** Removes the entry stored for key from the map (if it did exist). */
     public void remove(long key) {
-        if (natRemove(myShard.getTxCStruct(), key))
-            --currentSize;
+        natRemove(myShard.getTxCStruct(), key);
     }
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
@@ -171,8 +172,7 @@ public class LongToByteArrayOffHeapMap {
         if (data == null) {
             remove(key);
         } else {
-            if (natSet(myShard.getTxCStruct(), key, data, shouldICompressThis(data)))
-                ++currentSize;
+            natSet(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
         }
     }
     
@@ -180,15 +180,9 @@ public class LongToByteArrayOffHeapMap {
      * Deleting an entry can be done by passing null as the data pointer. */
     public byte [] put(long key, byte [] data) {
         if (data == null) {
-            byte [] result = natGetAndRemove(myShard.getTxCStruct(), key);
-            if (result != null)
-                --currentSize;
-            return result;
+            return natGetAndRemove(myShard.getTxCStruct(), key);
         } else {
-            byte [] result = natPut(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
-            if (result == null)
-                ++currentSize;
-            return result;
+            return natPut(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
         }
     }
     
@@ -199,9 +193,7 @@ public class LongToByteArrayOffHeapMap {
     public void storeRegion(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        if (natStoreRegion(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data))) {
-            ++currentSize;
-        }
+        natStoreRegion(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
     }
 
     /** Prints the histogram of the hash distribution. */
