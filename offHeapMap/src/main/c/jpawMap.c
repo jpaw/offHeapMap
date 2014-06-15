@@ -514,20 +514,20 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natRemove
+ * Method:    natDelete
  * Signature: (J)Z
  */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong ctx, jlong key) {
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natDelete(JNIEnv *env, jobject me, jlong ctx, jlong key) {
     return execRemove((struct tx_log_hdr *)ctx, (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID)), key);
 }
 
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natGetAndRemove
+ * Method:    natRemove
  * Signature: (J)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetAndRemove(JNIEnv *env, jobject me, jlong ctx, jlong key) {
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong ctx, jlong key) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *prev = NULL;

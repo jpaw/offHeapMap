@@ -48,7 +48,7 @@ public class LongToByteArrayOffHeapMap {
     private native void natClear();
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
-    private native boolean natRemove(long ctx, long key);
+    private native boolean natDelete(long ctx, long key);
     
     /** Returns the number of entries in the JNI data structure. */
     private native int natGetSize();
@@ -64,7 +64,7 @@ public class LongToByteArrayOffHeapMap {
     
     /** Read an entry and return it in uncompressed form, then deletes it from the structure.
      *  Returns null if no entry is present for the specified key. */
-    private native byte [] natGetAndRemove(long ctx, long key);
+    private native byte [] natRemove(long ctx, long key);
     
     /** Stores an entry in the map. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
      * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
@@ -149,8 +149,8 @@ public class LongToByteArrayOffHeapMap {
     }
 
     /** Removes the entry stored for key from the map (if it did exist). */
-    public void remove(long key) {
-        natRemove(myShard.getTxCStruct(), key);
+    public void delete(long key) {
+        natDelete(myShard.getTxCStruct(), key);
     }
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
@@ -178,7 +178,7 @@ public class LongToByteArrayOffHeapMap {
      * Deleting an entry can be done by passing null as the data pointer. */
     public void set(long key, byte [] data) {
         if (data == null) {
-            remove(key);
+            delete(key);
         } else {
             natSet(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
         }
@@ -188,7 +188,7 @@ public class LongToByteArrayOffHeapMap {
      * Deleting an entry can be done by passing null as the data pointer. */
     public byte [] put(long key, byte [] data) {
         if (data == null) {
-            return natGetAndRemove(myShard.getTxCStruct(), key);
+            return natRemove(myShard.getTxCStruct(), key);
         } else {
             return natPut(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
         }

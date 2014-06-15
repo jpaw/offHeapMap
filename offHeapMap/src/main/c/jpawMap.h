@@ -41,10 +41,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natRemove
+ * Method:    natDelete
  * Signature: (JJ)Z
  */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natDelete
   (JNIEnv *, jobject, jlong, jlong);
 
 /*
@@ -81,10 +81,10 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natGetAndRemove
+ * Method:    natRemove
  * Signature: (JJ)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetAndRemove
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove
   (JNIEnv *, jobject, jlong, jlong);
 
 /*

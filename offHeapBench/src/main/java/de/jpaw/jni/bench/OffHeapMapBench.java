@@ -28,10 +28,10 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.insertCommitOp           avgt         9      113.558        4.083    ns/op
 //d.j.j.b.OffHeapMapBench.insertGetOpNoTx          avgt         9      119.524        6.828    ns/op
 //d.j.j.b.OffHeapMapBench.insertOpNoTx             avgt         9       98.867        2.360    ns/op
-//d.j.j.b.OffHeapMapBench.insertRemoveCommitOp     avgt         9      132.018        5.663    ns/op
-//d.j.j.b.OffHeapMapBench.insertRemoveOpNoTx       avgt         9      122.806       10.912    ns/op
-//d.j.j.b.OffHeapMapBench.removeOpNoTx             avgt         9       17.074        0.912    ns/op
-//d.j.j.b.OffHeapMapBench.removeOpWithTx           avgt         9       30.245        1.029    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp     avgt         9      132.018        5.663    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx       avgt         9      122.806       10.912    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx             avgt         9       17.074        0.912    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx           avgt         9       30.245        1.029    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx               avgt         9       11.608        1.355    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx             avgt         9       12.087        1.318    ns/op
 
@@ -158,9 +158,9 @@ public class OffHeapMapBench {
     }
 
     @GenerateMicroBenchmark
-    public void insertRemoveOpNoTx() {
+    public void insertDeleteOpNoTx() {
         mapNoTransactions.set(KEY, SHORTDATA);
-        mapNoTransactions.remove(KEY);
+        mapNoTransactions.delete(KEY);
     }
     
     @GenerateMicroBenchmark
@@ -177,20 +177,20 @@ public class OffHeapMapBench {
     }
 
     @GenerateMicroBenchmark
-    public void insertRemoveCommitOp() {
+    public void insertDeleteCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
-        mapWithTransactions.remove(KEY);
+        mapWithTransactions.delete(KEY);
         transaction.commit(CHANGE_ID);
     }
     
     @GenerateMicroBenchmark
-    public void removeOpNoTx() {
-        mapNoTransactions.remove(KEY);
+    public void deleteOpNoTx() {
+        mapNoTransactions.delete(KEY);
     }
     
     @GenerateMicroBenchmark
-    public void removeOpWithTx() {
-        mapWithTransactions.remove(KEY);
+    public void deleteOpWithTx() {
+        mapWithTransactions.delete(KEY);
         transaction.commit(CHANGE_ID);
     }
 
