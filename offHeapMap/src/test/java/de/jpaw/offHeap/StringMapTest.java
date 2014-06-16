@@ -8,12 +8,12 @@ public class StringMapTest {
     static public final long KEY = 437L;
     
     public void runOpenCloseTest() {
-        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap(new LongToByteArrayOffHeapMap(1000));
+        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap(1000);
         myMap.close();
     }
 
     public void runStoreRetrieveTestUncompressed() {
-        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap(new LongToByteArrayOffHeapMap(1000));
+        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap(1000);
         
         myMap.set(KEY, TEXT);
         

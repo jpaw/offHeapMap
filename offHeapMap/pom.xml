@@ -62,8 +62,7 @@
                                     <arg value="-classpath" />
                                     <arg value="${project.build.outputDirectory}" />
                                     <arg value="-force" />
-                                    <arg value="de.jpaw.offHeap.LongToByteArrayOffHeapMap" />
-                                    <arg value="de.jpaw.offHeap.LongToByteArrayOffHeapMapEntryIterator" />
+                                    <arg value="de.jpaw.offHeap.AbstractPrimitiveLongKeyOffHeapMap" />
                                     <arg value="de.jpaw.offHeap.OffHeapTransaction" />
                                 </exec>
 
