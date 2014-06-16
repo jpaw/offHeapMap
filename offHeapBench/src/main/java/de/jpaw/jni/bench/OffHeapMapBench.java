@@ -22,18 +22,6 @@ import de.jpaw.offHeap.Shard;
 //
 // output on an Intel i7 980
 //
-//Benchmark                                        Mode   Samples         Mean   Mean error    Units
-//d.j.j.b.OffHeapMapBench.commitOpNoRows           avgt         9       13.347        0.528    ns/op
-//d.j.j.b.OffHeapMapBench.insertCommitGetOp        avgt         9      134.339        6.545    ns/op
-//d.j.j.b.OffHeapMapBench.insertCommitOp           avgt         9      113.558        4.083    ns/op
-//d.j.j.b.OffHeapMapBench.insertGetOpNoTx          avgt         9      119.524        6.828    ns/op
-//d.j.j.b.OffHeapMapBench.insertOpNoTx             avgt         9       98.867        2.360    ns/op
-//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp     avgt         9      132.018        5.663    ns/op
-//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx       avgt         9      122.806       10.912    ns/op
-//d.j.j.b.OffHeapMapBench.deleteOpNoTx             avgt         9       17.074        0.912    ns/op
-//d.j.j.b.OffHeapMapBench.deleteOpWithTx           avgt         9       30.245        1.029    ns/op
-//
-
 // compare size when using ((*env)->GetLongField(env, me, javaMapCStructFID)) vs passing it as a parameter:
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx               avgt         9       11.608        1.355    ns/op  // GetLongField
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx             avgt         9       12.087        1.318    ns/op  // GetLongField
@@ -41,20 +29,6 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx             avgt        15        8.400        0.268    ns/op  // parameter
 // => This is consistent with http://www.ibm.com/developerworks/library/j-jni/, passign as a parameter is 3 ns faster per invocation
 
-//Benchmark                                               Mode   Samples         Mean   Mean error    Units
-//d.j.j.b.OffHeapMapBench.getSmallCompressedOp            avgt         9       20.295        0.918    ns/op
-//d.j.j.b.OffHeapMapBench.getSmallOp                      avgt         9       20.317        0.450    ns/op
-//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx     avgt         9      447.336        2.338    ns/op
-//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt         9       98.523        0.891    ns/op
-//
-//d.j.j.b.OffHeapMapBench.get1KBCompressedOp              avgt         9       20.214        1.779    ns/op
-//d.j.j.b.OffHeapMapBench.get1KBOp                        avgt         9       19.881        0.498    ns/op
-//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                 avgt         9      163.259       15.927    ns/op
-//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx       avgt         9     1184.993       19.434    ns/op
-//
-// => compression speed is about 700 ns / KB => 1.3 GB / s
-
-// everything measured with new parameter passing: all got faster except read, which got much worse
 //Benchmark                                               Mode   Samples         Mean   Mean error    Units
 //d.j.j.b.OffHeapMapBench.commitOpNoRows                  avgt        15       13.444        0.540    ns/op
 //d.j.j.b.OffHeapMapBench.deleteOpNoTx                    avgt        15       14.409        1.118    ns/op
@@ -74,6 +48,27 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt        15       92.397        3.413    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt        15        8.549        0.443    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt        15        9.761        1.256    ns/op
+
+// Benchmark after refactoring to abstract parent class:
+//Benchmark                                               Mode   Samples         Mean   Mean error    Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                  avgt         6       10.891        0.287    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                    avgt         6       13.731        0.286    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                  avgt         6       24.758        0.128    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp              avgt         6      383.262       16.040    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                        avgt         6      186.303       30.967    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp            avgt         6      128.687        6.026    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                      avgt         6       86.294        4.179    ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                 avgt         6      145.011       22.454    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp               avgt         6      204.663       10.392    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                  avgt         6      101.231        3.265    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx       avgt         6     1170.021       60.519    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx     avgt         6      441.709       13.129    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt         6      115.040        5.159    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx              avgt         6      102.764        4.071    ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                 avgt         6      177.548        1.726    ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt         6       88.208        0.450    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt         6        8.756        0.075    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt         6        8.400        1.050    ns/op
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
