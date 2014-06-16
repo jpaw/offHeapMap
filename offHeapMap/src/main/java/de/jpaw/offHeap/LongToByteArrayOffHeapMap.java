@@ -45,56 +45,56 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     
     /** Closes the map (clears the map and all entries it from memory).
      * After close() has been called, the object should not be used any more. */
-    private native void natClose();
+    private native void natClose(long cMap);
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
-    private native void natClear(long ctx);
+    private native void natClear(long cMap, long ctx);
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
-    private native boolean natDelete(long ctx, long key);
+    private native boolean natDelete(long cMap, long ctx, long key);
     
     /** Returns the number of entries in the JNI data structure. */
-    private native int natGetSize();
+    private native int natGetSize(long cMap);
     
     /** Returns the (uncompressed) size of the data stored for key, or -1 if null / no entry is stored for key. */
-    private native int natLength(long key);
+    private native int natLength(long cMap, long key);
     
     /** Returns the compressed size of a stored entry, or -1 if no entry is stored, or 0 if the data is not compressed. */
-    private native int natCompressedLength(long key);
+    private native int natCompressedLength(long cMap, long key);
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
-    private native byte [] natGet(long key);
+    private native byte [] natGet(long cMap, long key);
     
     /** Read an entry and return it in uncompressed form, then deletes it from the structure.
      *  Returns null if no entry is present for the specified key. */
-    private native byte [] natRemove(long ctx, long key);
+    private native byte [] natRemove(long cMap, long ctx, long key);
     
     /** Stores an entry in the map. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
      * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
-    private native boolean natSet(long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
+    private native boolean natSet(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     /** Stores an entry in the map and returns the previous entry, or null if there was no prior entry for this key.
      * data may not be null (use get(key) for that purpose). */
-    private native byte [] natPut(long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
+    private native byte [] natPut(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
      * Chains of bigger length are not counted. The method returns the longest chain length. */
-    private native int natGetHistogram(int [] chainsOfLength);
+    private native int natGetHistogram(long cMap, int [] chainsOfLength);
     
     /** Copy an entry into a preallocated byte area, at a certain offset. */
-    private native int natGetIntoPreallocated(long key, byte [] target, int offset);
+    private native int natGetIntoPreallocated(long cMap, long key, byte [] target, int offset);
     
     /** Return a portion of a stored element, determined by offset and length.
      * The purpose of this method is to allow the transfer of a small portion of the data.
      * returns -1 if the entry did not exist, or the number of bytes transferred. */
-    public native byte [] natGetRegion(long key, int offset, int length);
+    public native byte [] natGetRegion(long cMap, long key, int offset, int length);
 
     /** Return a portion of a stored element, determined by field delimiters, excluding the delimiters.
      * Field numbering starts with 0. The first delimiter acts as a field separator, such as comma in CSV,
      * the second is an alternate delimiter, which indicates the following field should be interpreted as null.
      * (Normally, a field is considered as null only if the data ends before.) If the second delimiter is not desired,
      * assign it the same value as the first delimiter. */
-    private native byte [] natGetField(long key, int fieldNo, byte delimiter, byte nullIndicator);
+    private native byte [] natGetField(long cMap, long key, int fieldNo, byte delimiter, byte nullIndicator);
 
     //
     // External API, as a wrapper to the internal native one.
@@ -128,13 +128,13 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     /** Returns the number of entries currently in the map. */
     @Override
     public int size() {
-        return natGetSize();
+        return natGetSize(cStruct);
     }
     
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
      * Chains of bigger length are not counted. The method returns the longest chain length. */
     public int getHistogram(int [] chainsOfLength) {
-        return natGetHistogram(chainsOfLength);
+        return natGetHistogram(cStruct, chainsOfLength);
     }
     
     
@@ -151,35 +151,36 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     /** Closes the map (clears the map and all entries it from memory).
      * After close() has been called, the object should not be used any more. */
     public void close() {
-        natClose();
+        natClose(cStruct);
+        cStruct = 0L;
     }
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
     @Override
     public void clear() {
-        natClear(myShard.getTxCStruct());
+        natClear(cStruct, myShard.getTxCStruct());
     }
 
     /** Removes the entry stored for key from the map (if it did exist). */
     @Override
     public void delete(long key) {
-        natDelete(myShard.getTxCStruct(), key);
+        natDelete(cStruct, myShard.getTxCStruct(), key);
     }
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
     @Override
     public byte [] get(long key) {
-        return natGet(key);
+        return natGet(cStruct, key);
     }
     
     /** Returns the length of a stored entry, or -1 if no entry is stored. */
     public int length(long key) {
-        return natLength(key);
+        return natLength(cStruct, key);
     }
     
     /** Returns the compressed size of a stored entry, or -1 if no entry is stored, or 0 if the data is not compressed. */
     public int compressedLength(long key) {
-        return natCompressedLength(key);
+        return natCompressedLength(cStruct, key);
     }
     
     /** Stores an entry in the map.
@@ -190,7 +191,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
         if (data == null) {
             delete(key);
         } else {
-            natSet(myShard.getTxCStruct(), key, data, 0, data.length, shouldICompressThis(data));
+            natSet(cStruct, myShard.getTxCStruct(), key, data, 0, data.length, shouldICompressThis(data));
         }
     }
     
@@ -199,9 +200,9 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     @Override
     public byte [] put(long key, byte [] data) {
         if (data == null) {
-            return natRemove(myShard.getTxCStruct(), key);
+            return natRemove(cStruct, myShard.getTxCStruct(), key);
         } else {
-            return natPut(myShard.getTxCStruct(), key, data, 0, data.length, shouldICompressThis(data));
+            return natPut(cStruct, myShard.getTxCStruct(), key, data, 0, data.length, shouldICompressThis(data));
         }
     }
     
@@ -212,7 +213,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     public void setFromBuffer(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        natSet(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
+        natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
     }
 
     /** Prints the histogram of the hash distribution. */
@@ -220,7 +221,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
         if (out == null)
             out = System.out;
         int [] histogram = new int [len];
-        int maxChainLen = natGetHistogram(histogram);
+        int maxChainLen = natGetHistogram(cStruct, histogram);
         out.println("Currently " + size() + " entries are stored, with maximum chain length " + maxChainLen);
         for (int i = 0; i < len; ++i)
             out.println(String.format("%6d Chains of length %3d", histogram[i], i));
@@ -234,12 +235,12 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     /** Returns true if an entry is stored for key (i.e. get(key) would return non null), and false otherwise. */
     @Override
     public boolean containsKey(long key) {
-        return natLength(key) >= 0;
+        return natLength(cStruct, key) >= 0;
     }
 
     @Override
     public byte[] remove(long key) {
-        return natRemove(myShard.getTxCStruct(), key);
+        return natRemove(cStruct, myShard.getTxCStruct(), key);
     }
 
     @Override
@@ -258,14 +259,14 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
      * The purpose of this method is to allow the transfer of a small portion of the data.
      * returns -1 if the entry did not exist, or the number of bytes transferred. */
     public byte [] getRegion(long key, int offset, int length) {
-        return natGetRegion(key, offset, length);
+        return natGetRegion(cStruct, key, offset, length);
     }
     
     /** Return an object into an existing buffer. The number of bytes written is returned, or -1 if the object did not exist.
      * The number of bytes written can be smaller than the full object would require, if the target buffer is too small.
      */
     public int getIntoBuffer(long key, byte [] buffer, int offset) {
-        return natGetIntoPreallocated(key, buffer, offset);
+        return natGetIntoPreallocated(cStruct, key, buffer, offset);
     }
     
     /** Return a portion of a stored element, determined by field delimiters, excluding the delimiters.
@@ -274,7 +275,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
      * (Normally, a field is considered as null only if the data ends before.) If the second delimiter is not desired,
      * assign it the same value as the first delimiter. */
     public byte [] getField(long key, int fieldNo, byte delimiter, byte nullIndicator) {
-        return natGetField(key, fieldNo, delimiter, nullIndicator);
+        return natGetField(cStruct, key, fieldNo, delimiter, nullIndicator);
     }
     public byte [] getField(long key, int fieldNo, byte delimiter) {
         return getField(key, fieldNo, delimiter, delimiter);

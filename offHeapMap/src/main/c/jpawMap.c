@@ -473,17 +473,12 @@ void clear(struct entry **data, int numEntries) {
  * Method:    natClose
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(JNIEnv *env, jobject me) {
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(JNIEnv *env, jobject me, jlong cMap) {
     // Get the int given the Field ID
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    // printf("jpawMap: closing map at %p\n", mapdata);
+    struct map *mapdata = (struct map *) cMap;
     clear(mapdata->data, mapdata->hashTableSize);
     free(mapdata->data);
     free(mapdata);
-    (*env)->SetLongField(env, me, javaMapCStructFID, (jlong) 0);
-    // do not delete it, it could be usedby other maps
-//    (*env)->DeleteGlobalRef(env, javaMapClass);
-//    javaMapClass = NULL;
 }
 
 
@@ -493,9 +488,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose(J
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetSize
-  (JNIEnv *env, jobject me) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    return mapdata->count;
+    (JNIEnv *env, jobject me, jlong cMap) {
+    return ((struct map *)cMap)->count;
 }
 
 
@@ -504,9 +498,9 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetSize
  * Method:    natClear
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(JNIEnv *env, jobject me, jlong ctxAsLong) {
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(JNIEnv *env, jobject me, jlong cMap, jlong ctxAsLong) {
     // Get the int given the Field ID
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+    struct map *mapdata = (struct map *) cMap;
     struct tx_log_hdr *ctx = (struct tx_log_hdr *)ctxAsLong;
     if (!IS_TRANSACTIONAL(ctx, mapdata)) {
         // this is faster
@@ -578,8 +572,8 @@ struct entry *find_entry(struct map *mapdata, long key) {
  * Method:    natGet
  * Signature: (J)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGet(JNIEnv *env, jobject me, jlong key) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGet(JNIEnv *env, jobject me, jlong cMap, jlong key) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     return toJavaByteArray(env, e);
 }
@@ -589,8 +583,8 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
  * Method:    natLength
  * Signature: (J)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(JNIEnv *env, jobject me, jlong key) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(JNIEnv *env, jobject me, jlong cMap, jlong key) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     return (jint)(e ? e->uncompressedSize : -1);
 }
@@ -600,8 +594,8 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natLength(
  * Method:    natCompressedLength
  * Signature: (J)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natCompressedLength(JNIEnv *env, jobject me, jlong key) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natCompressedLength(JNIEnv *env, jobject me, jlong cMap, jlong key) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     return (jint)(e ? e->compressedSize : -1);
 }
@@ -645,8 +639,8 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
  * Method:    natDelete
  * Signature: (J)Z
  */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natDelete(JNIEnv *env, jobject me, jlong ctx, jlong key) {
-    return execRemove((struct tx_log_hdr *)ctx, (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID)), key);
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natDelete(JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
+    return execRemove((struct tx_log_hdr *)ctx, (struct map *) cMap, key);
 }
 
 
@@ -655,8 +649,8 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natDel
  * Method:    natRemove
  * Signature: (J)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong ctx, jlong key) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
+    struct map *mapdata = (struct map *) cMap;
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *prev = NULL;
     struct entry *e = mapdata->data[hash];
@@ -774,8 +768,8 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
  * Signature: (J[BZ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet(
-        JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+        JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
@@ -793,8 +787,8 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet
  * Signature: (J[BZ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut(
-        JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+        JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
@@ -823,8 +817,8 @@ int computeChainLength(struct entry *e) {
  * Signature: ([I)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHistogram
-  (JNIEnv *env, jobject me, jintArray histogram) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+  (JNIEnv *env, jobject me, jlong cMap, jintArray histogram) {
+    struct map *mapdata = (struct map *) cMap;
     int maxLen = 0;
     int numHistogramEntries = (*env)->GetArrayLength(env, histogram);
     int *ctr = calloc(numHistogramEntries, sizeof(int));
@@ -852,8 +846,8 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHist
  * Signature: (J[BII)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetIntoPreallocated
-  (JNIEnv *env, jobject me, jlong key, jbyteArray target, jint offset) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+  (JNIEnv *env, jobject me, jlong cMap, jlong key, jbyteArray target, jint offset) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     if (!e)
         return -1;  // key does not exist
@@ -876,8 +870,8 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetInto
  * Signature: (JII)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetRegion
-  (JNIEnv *env, jobject me, jlong key, jint offset, jint length) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+  (JNIEnv *env, jobject me, jlong cMap, jlong key, jint offset, jint length) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     if (!e)
         return (jbyteArray)0;
@@ -885,7 +879,6 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
         throwAny(env, "Copying from compressed entries not yet implemented");
         return (jbyteArray)0;  // not yet implemented
     }
-    char *ptr = e->data;
     int len = offset >= e->uncompressedSize ? 0 : offset + length <= e->uncompressedSize ? length : e->uncompressedSize - offset;
     jbyteArray result = (*env)->NewByteArray(env, len);
     if (len)
@@ -899,8 +892,8 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natG
  * Signature: (JIBB)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetField
-  (JNIEnv *env, jobject me, jlong key, jint fieldNo, jbyte delimiter, jbyte nullIndicator) {
-    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+  (JNIEnv *env, jobject me, jlong cMap, jlong key, jint fieldNo, jbyte delimiter, jbyte nullIndicator) {
+    struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     if (!e)
         return (jbyteArray)0;
