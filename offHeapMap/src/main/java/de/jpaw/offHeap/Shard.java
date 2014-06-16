@@ -16,7 +16,7 @@ public class Shard {
 
     public long getTxCStruct() {
         OffHeapTransaction tx = owningTransaction;
-        return tx == null ? 0L : tx.cStruct;
+        return tx == null ? 0L : tx.getCStruct();
     }
     
     public OffHeapTransaction getOwningTransaction() {

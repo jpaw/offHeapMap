@@ -6,7 +6,7 @@
 #include "jpawMap.h"
 
 #define USE_CRITICAL_FOR_STORE
-#define USE_CRITICAL_FOR_RETRIEVAL
+// #define USE_CRITICAL_FOR_RETRIEVAL       // this seems to be much slower!
 
 #undef SEPARATE_COMMITTED_VIEW
 
@@ -69,11 +69,11 @@ struct tx_log_hdr {
     int modes;
     struct tx_log_list *chunks[TX_LOG_ENTRIES_PER_CHUNK_LV1];
 };
-static jclass javaTxClass;
-static jfieldID javaTxCStructFID;
-static jclass javaMapClass;
-static jfieldID javaMapCStructFID;
-static jclass javaIteratorClass;
+//static jclass javaTxClass;
+//static jfieldID javaTxCStructFID;
+//static jclass javaMapClass;
+//static jfieldID javaMapCStructFID;
+//static jclass javaIteratorClass;
 static jfieldID javaIteratorCurrentHashIndexFID;
 static jfieldID javaIteratorCurrentKeyFID;
 
@@ -108,15 +108,15 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry);
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator_natInit
   (JNIEnv *env, jclass myClass) {
-    javaIteratorClass = (*env)->NewGlobalRef(env, myClass); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
+    //javaIteratorClass = (*env)->NewGlobalRef(env, myClass); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
 
     // Get the Field ID of the instance variables "number"
-    javaIteratorCurrentKeyFID = (*env)->GetFieldID(env, javaIteratorClass, "currentKey", "J");
+    javaIteratorCurrentKeyFID = (*env)->GetFieldID(env, myClass, "currentKey", "J");
     if (!javaIteratorCurrentKeyFID) {
         throwAny(env, "Invoking class must have a field long currentKey");
         return;
     }
-    javaIteratorCurrentHashIndexFID = (*env)->GetFieldID(env, javaIteratorClass, "currentHashIndex", "I");
+    javaIteratorCurrentHashIndexFID = (*env)->GetFieldID(env, myClass, "currentHashIndex", "I");
     if (!javaIteratorCurrentHashIndexFID) {
         throwAny(env, "Invoking class must have a field int currentHashIndex");
         return;
@@ -132,8 +132,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterat
  * Signature: (JJ)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator_natIterate
-  (JNIEnv *env, jobject myClass, jlong mapAsLong, jlong nextEntryPtr, jint hashIndex) {
-    struct map *mapdata = (struct map *)mapAsLong;
+  (JNIEnv *env, jobject myClass, jlong cMap, jlong nextEntryPtr, jint hashIndex) {
+    struct map *mapdata = (struct map *)cMap;
     struct entry *e = (struct entry *)nextEntryPtr;
 #ifdef DEBUG
     fprintf(stderr, "iterate on map %16p (has %d entries in %d slots)\n", mapdata, mapdata->count, mapdata->hashTableSize);
@@ -172,23 +172,6 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryItera
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natInit
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natInit
-  (JNIEnv *env, jclass txClass) {
-    javaTxClass = (*env)->NewGlobalRef(env, txClass); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
-
-    // Get the Field ID of the instance variables "number"
-    javaTxCStructFID = (*env)->GetFieldID(env, javaTxClass, "cStruct", "J");
-    if (!javaTxCStructFID) {
-        throwAny(env, "Invoking class must have a field long cStruct");
-        return;
-    }
-}
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCreateTransaction
  * Signature: (I)J
  */
@@ -215,8 +198,8 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
-  (JNIEnv *env, jobject me) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+  (JNIEnv *env, jobject me, jlong cTx) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     if (hdr->number_of_changes) {
         throwAny(env, "Cannot close within pending transaction");
         return;
@@ -227,7 +210,6 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransacti
         free(hdr->chunks[i]);
     }
     free(hdr);
-    (*env)->SetLongField(env, me, javaTxCStructFID, (jlong)0);
 #ifdef DEBUG
     fprintf(stderr, "CLOSE TRANSACTION\n");
 #endif
@@ -240,8 +222,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransacti
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
-  (JNIEnv *env, jobject me, jint mode) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+  (JNIEnv *env, jobject me, jlong cTx, jint mode) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     if (hdr->number_of_changes) {
         throwAny(env, "Cannot change mode within pending transaction");
         return;
@@ -255,8 +237,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
-  (JNIEnv *env, jobject me) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+  (JNIEnv *env, jobject me, jlong cTx) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     return hdr->number_of_changes;
 }
 
@@ -266,12 +248,12 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *env, jobject me, jlong ref) {
+  (JNIEnv *env, jobject me, jlong cTx, jlong ref) {
     // currently no redo logs are written. Therefore just discard the entries
 #ifdef DEBUG
     fprintf(stderr, "COMMIT START\n");
 #endif
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     int currentEntries = hdr->number_of_changes;
     if (currentEntries) {
         struct tx_log_list *chunk = NULL;
@@ -326,8 +308,8 @@ void rollback(struct tx_log_entry *e) {
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natDebugRedoLog
-  (JNIEnv *env, jobject me) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+  (JNIEnv *env, jobject me, jlong cTx) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     int currentEntries = hdr->number_of_changes;
     int i;
     for (i = 0; i < currentEntries; ++i) {
@@ -378,11 +360,11 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
-  (JNIEnv *env, jobject me, jint rollbackTo) {
+  (JNIEnv *env, jobject me, jlong cTx, jint rollbackTo) {
 #ifdef DEBUG
     fprintf(stderr, "ROLLBACK START (%d)\n", rollbackTo);
 #endif
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     int currentEntries = hdr->number_of_changes;
     if (currentEntries > rollbackTo) {
         struct tx_log_list *chunk = hdr->chunks[currentEntries >> 8];
@@ -400,41 +382,18 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
 }
 
 
-
-
-
-
-
-
-
-/*
- * Class:     Java_de_jpaw_offHeap_OffHeapTransaction_natInit
- * Method:    natInit
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natInit(JNIEnv *env, jobject me) {
-    javaMapClass = (*env)->NewGlobalRef(env, (*env)->GetObjectClass(env, me)); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
-
-    // Get the Field ID of the instance variables "number"
-    javaMapCStructFID = (*env)->GetFieldID(env, javaMapClass, "cStruct", "J");
-    if (!javaMapCStructFID) {
-        throwAny(env, "Invoking class must have a field long cStruct");
-        return;
-    }
-}
-
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natOpen
  * Signature: (I)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JNIEnv *env, jobject me, jint size, jint mode) {
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JNIEnv *env, jobject me, jint size, jint mode) {
     // round up the size to multiples of 32, for the collision indicator
     size = ((size - 1) | 31) + 1;
     struct map *mapdata = malloc(sizeof(struct map));
     if (!mapdata) {
         throwOutOfMemory(env);
-        return;
+        return 0L;
     }
     mapdata->hashTableSize = size;
     mapdata->modes = mode;
@@ -443,11 +402,11 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen(JN
     mapdata->padding = 0;
     if (!mapdata->data) {
         throwOutOfMemory(env);
-        return;
+        return 0L;
     }
 
     // printf("jpawMap: created new map at %p\n", mapdata);
-    (*env)->SetLongField(env, me, javaMapCStructFID, (jlong) mapdata);
+    return (jlong) mapdata;
 }
 
 int computeHash(jlong arg, int size) {

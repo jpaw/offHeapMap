@@ -9,18 +9,10 @@ extern "C" {
 #endif
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natInit
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natInit
-  (JNIEnv *, jobject);
-
-/*
- * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natOpen
- * Signature: (II)V
+ * Signature: (II)J
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natOpen
   (JNIEnv *, jobject, jint, jint);
 
 /*
@@ -175,14 +167,6 @@ extern "C" {
 #endif
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natInit
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natInit
-  (JNIEnv *, jclass);
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCreateTransaction
  * Signature: (I)J
  */
@@ -192,50 +176,50 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natSetMode
- * Signature: (I)V
+ * Signature: (JI)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
-  (JNIEnv *, jobject, jint);
+  (JNIEnv *, jobject, jlong, jint);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: (J)I
+ * Signature: (JJ)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natRollback
- * Signature: (I)V
+ * Signature: (JI)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
-  (JNIEnv *, jobject, jint);
+  (JNIEnv *, jobject, jlong, jint);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natSetSafepoint
- * Signature: ()I
+ * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCloseTransaction
- * Signature: ()V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natDebugRedoLog
- * Signature: ()V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natDebugRedoLog
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
 }

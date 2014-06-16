@@ -24,39 +24,38 @@ public class OffHeapTransaction {
     
     static {
         OffHeapInit.init();
-        natInit();
     }
-    
-    /** Register globals. */
-    private native static void natInit();
     
     /** Set up the JNI data structures for a new transaction. */
     private native long natCreateTransaction(int initialMode);
     
     /** Set the logging modes of a transaction. Throws an exception if pending data is in the buffer. */
-    private native void natSetMode(int modes);
+    private native void natSetMode(long cTx, int modes);
     
     /** Commit a pending transaction. (Returns the number of low level DB row operations) */
-    private native int natCommit(long ref);
+    private native int natCommit(long cTx, long ref);
     
     /** Rollback a pending transaction (possibly only to a safepoint). */
-    private native void natRollback(int toWhere);
+    private native void natRollback(long cTx, int toWhere);
     
     /** Define a safepoint. */
-    private native int natSetSafepoint();
+    private native int natSetSafepoint(long cTx);
     
     /** Removes a transaction from memory. */
-    private native void natCloseTransaction();
+    private native void natCloseTransaction(long cTx);
 
     /** Prints a log of the redo / rollback table. For debugging. */
-    private native void natDebugRedoLog();
+    private native void natDebugRedoLog(long cTx);
     
     /** Only used by native code, to store the off heap address of the structure. */
-    protected final long cStruct;
+    private long cStruct;
     private int currentMode = 0;
     private int lastSafepoint = 0;
     private int rowsChanged = 0;
     
+    protected long getCStruct() {
+        return cStruct;  // for the Shard
+    }
     
     public OffHeapTransaction(int initialMode) {
         currentMode = initialMode;
@@ -66,29 +65,30 @@ public class OffHeapTransaction {
     public void rollback() {
         if ((currentMode & TRANSACTIONAL) == 0)
             throw new RuntimeException("Not running in transactional mode");
-        natRollback(0);
+        natRollback(cStruct, 0);
         lastSafepoint = 0;
     }
 
     public void setSafepoint() {
-        lastSafepoint = natSetSafepoint();
+        lastSafepoint = natSetSafepoint(cStruct);
     }
     
     public void rollbackToSafepoint() {
-        natRollback(lastSafepoint);
+        natRollback(cStruct, lastSafepoint);
     }
 
     public void commit() {
-        rowsChanged += natCommit(transactionRef.incrementAndGet());
+        rowsChanged += natCommit(cStruct, transactionRef.incrementAndGet());
     }
     public void commit(long ref) {
-        rowsChanged += natCommit(ref);
+        rowsChanged += natCommit(cStruct, ref);
     }
     public void close() {
-        natCloseTransaction();
+        natCloseTransaction(cStruct);
+        cStruct = 0L;
     }
     
     public void printRedoLog() {
-        natDebugRedoLog();        
+        natDebugRedoLog(cStruct);        
     }
 }

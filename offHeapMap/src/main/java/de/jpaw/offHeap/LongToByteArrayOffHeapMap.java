@@ -11,10 +11,10 @@ import de.jpaw.collections.PrimitiveLongKeyMap;
  * 
  *  This implementation is not thread-safe. */
 public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, Iterable<PrimitiveLongKeyMap.Entry<byte []>> {
-    /** Internal state to indicate if the native libraries have been loaded. It is false after the class has been initialized
-     * and will be set to true once the first map should be created.
-     */
-    private static Boolean isInitialized = Boolean.FALSE;
+    
+    static {
+        OffHeapInit.init();
+    }
     
     private final Shard myShard;
     
@@ -34,14 +34,10 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     // internal native API
     //
     
-    /** Initialization of the JNI code. Must be called before any other method is used. May only be called once.
-     */
-    private native void natInit();
-    
     /** Allocates and initializes a new data structure for the given maximum number of elements.
-     * Stores the resulting off heap location in the private field cStruct.
+     * Returns the resulting off heap location.
      */
-    private native void natOpen(int size, int modes);
+    private native long natOpen(int size, int modes);
     
     /** Closes the map (clears the map and all entries it from memory).
      * After close() has been called, the object should not be used any more. */
@@ -107,16 +103,8 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     }
     
     public LongToByteArrayOffHeapMap(int size, Shard forShard, int modes) {
-        myShard = forShard; 
-        synchronized (isInitialized) {
-            if (!isInitialized) {
-                OffHeapInit.init();
-                natInit();
-                // now we are (unless an Exception was thrown)
-                isInitialized = Boolean.TRUE;
-            }
-        }
-        natOpen(size, modes);
+        myShard = forShard;
+        cStruct = natOpen(size, modes);
     }
     public LongToByteArrayOffHeapMap(int size, Shard forShard) {
         this(size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, -1);
