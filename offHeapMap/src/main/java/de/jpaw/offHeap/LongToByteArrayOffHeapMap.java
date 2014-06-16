@@ -71,20 +71,31 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     
     /** Stores an entry in the map. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
      * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
-    private native boolean natSet(long ctx, long key, byte [] data, boolean doCompress);
-    
-    /** Stores an entry in the map, specified by a region within some data. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
-     * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
-    private native boolean natStoreRegion(long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
+    private native boolean natSet(long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     /** Stores an entry in the map and returns the previous entry, or null if there was no prior entry for this key.
      * data may not be null (use get(key) for that purpose). */
-    private native byte [] natPut(long ctx, long key, byte [] data, boolean doCompress);
+    private native byte [] natPut(long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
      * Chains of bigger length are not counted. The method returns the longest chain length. */
     private native int natGetHistogram(int [] chainsOfLength);
     
+    /** Copy an entry into a preallocated byte area, at a certain offset. */
+    private native int natGetIntoPreallocated(long key, byte [] target, int offset);
+    
+    /** Return a portion of a stored element, determined by offset and length.
+     * The purpose of this method is to allow the transfer of a small portion of the data.
+     * returns -1 if the entry did not exist, or the number of bytes transferred. */
+    public native byte [] natGetRegion(long key, int offset, int length);
+
+    /** Return a portion of a stored element, determined by field delimiters, excluding the delimiters.
+     * Field numbering starts with 0. The first delimiter acts as a field separator, such as comma in CSV,
+     * the second is an alternate delimiter, which indicates the following field should be interpreted as null.
+     * (Normally, a field is considered as null only if the data ends before.) If the second delimiter is not desired,
+     * assign it the same value as the first delimiter. */
+    private native byte [] natGetField(long key, int fieldNo, byte delimiter, byte nullIndicator);
+
     //
     // External API, as a wrapper to the internal native one.
     // The Java methods maintain the current size, in order to allow fast access to it from Java without the need to perform a JNI call.
@@ -179,7 +190,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
         if (data == null) {
             delete(key);
         } else {
-            natSet(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
+            natSet(myShard.getTxCStruct(), key, data, 0, data.length, shouldICompressThis(data));
         }
     }
     
@@ -190,7 +201,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
         if (data == null) {
             return natRemove(myShard.getTxCStruct(), key);
         } else {
-            return natPut(myShard.getTxCStruct(), key, data, shouldICompressThis(data));
+            return natPut(myShard.getTxCStruct(), key, data, 0, data.length, shouldICompressThis(data));
         }
     }
     
@@ -201,7 +212,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     public void storeRegion(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        natStoreRegion(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
+        natSet(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
     }
 
     /** Prints the histogram of the hash distribution. */
@@ -241,5 +252,31 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     @Override
     public Iterator<PrimitiveLongKeyMap.Entry<byte[]>> iterator() {
         return new LongToByteArrayOffHeapMapEntryIterator(this, cStruct);
+    }
+    
+    /** Return a portion of a stored element, determined by offset and length.
+     * The purpose of this method is to allow the transfer of a small portion of the data.
+     * returns -1 if the entry did not exist, or the number of bytes transferred. */
+    public byte [] getRegion(long key, int offset, int length) {
+        return natGetRegion(key, offset, length);
+    }
+    
+    /** Return an object into an existing buffer. The number of bytes written is returned, or -1 if the object did not exist.
+     * The number of bytes written can be smaller than the full object would require, if the target buffer is too small.
+     */
+    public int getIntoBuffer(long key, byte [] buffer, int offset) {
+        return natGetIntoPreallocated(key, buffer, offset);
+    }
+    
+    /** Return a portion of a stored element, determined by field delimiters, excluding the delimiters.
+     * Field numbering starts with 0. The first delimiter acts as a field separator, such as comma in CSV,
+     * the second is an alternate delimiter, which indicates the following field should be interpreted as null.
+     * (Normally, a field is considered as null only if the data ends before.) If the second delimiter is not desired,
+     * assign it the same value as the first delimiter. */
+    public byte [] getField(long key, int fieldNo, byte delimiter, byte nullIndicator) {
+        return natGetField(key, fieldNo, delimiter, nullIndicator);
+    }
+    public byte [] getField(long key, int fieldNo, byte delimiter) {
+        return getField(key, fieldNo, delimiter, delimiter);
     }
 }

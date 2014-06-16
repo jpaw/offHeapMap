@@ -274,7 +274,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
     struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
     int currentEntries = hdr->number_of_changes;
     if (currentEntries) {
-        struct tx_log_list *chunk;
+        struct tx_log_list *chunk = NULL;
         int i;
         for (i = 0; i < currentEntries; ++i) {
             if (!(i & 0xff)) {
@@ -681,23 +681,23 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natR
 }
 
 
-struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean doCompress) {
-    int uncompressed_length = (*env)->GetArrayLength(env, data);
+struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
+    // int uncompressed_length = (*env)->GetArrayLength(env, data);
     struct entry *e;
     if (doCompress) {
         // compress the data. Allocate a target buffer
-        int max_compressed_length = round_up_size(LZ4_compressBound(uncompressed_length));
+        int max_compressed_length = round_up_size(LZ4_compressBound(length));
         struct entry *tmp_dst = malloc(sizeof(struct entry) + max_compressed_length);
         if (!tmp_dst) {
             return NULL;  // will throw OOM
         }
 #ifndef USE_CRITICAL_FOR_STORE
-        void *tmp_src = malloc(uncompressed_length);
+        void *tmp_src = malloc(length);
         if (!tmp_src) {
             free(tmp_dst);
             return NULL;  // will throw OOM
         }
-        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, tmp_src);
+        (*env)->GetByteArrayRegion(env, data, offset, length, tmp_src);
         int actual_compressed_length = LZ4_compress(tmp_src, tmp_dst->data, uncompressed_length);
         free(tmp_src);
 #else
@@ -705,11 +705,11 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
         jboolean isCopy = 0;
         void *src = (*env)->GetPrimitiveArrayCritical(env, data, &isCopy);
         if (!src) {
+            free(tmp_dst);
             throwOutOfMemory(env);
-            // TODO: release result?
             return NULL;
         }
-        int actual_compressed_length = LZ4_compress(src, tmp_dst->data, uncompressed_length);
+        int actual_compressed_length = LZ4_compress(src+offset, tmp_dst->data, length);
         (*env)->ReleasePrimitiveArrayCritical(env, data, src, JNI_ABORT);  // abort, as we did not change anything
 #endif
         // TODO: if the uncompressed size needs the same space (or less) than the compressed, use the uncompressed form instead!
@@ -722,15 +722,15 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
         } else {
             e = tmp_dst;
         }
-        e->uncompressedSize = uncompressed_length;
+        e->uncompressedSize = length;
         e->compressedSize = actual_compressed_length;
     } else {
-        e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(uncompressed_length));
+        e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(length));
         if (!e)
             return NULL;  // will throw OOM
-        e->uncompressedSize = uncompressed_length;
+        e->uncompressedSize = length;
         e->compressedSize = 0;
-        (*env)->GetByteArrayRegion(env, data, 0, uncompressed_length, (jbyte *)e->data);
+        (*env)->GetByteArrayRegion(env, data, offset, length, (jbyte *)e->data);
     }
     e->key = key;
     return e;
@@ -738,8 +738,6 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
 
 
 struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
-//    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-//    struct entry *newEntry = create_new_entry(env, data, doCompress);
     jlong key = newEntry->key;
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *e = mapdata->data[hash];
@@ -776,9 +774,9 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
  * Signature: (J[BZ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet(
-        JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jboolean doCompress) {
+        JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    struct entry *newEntry = create_new_entry(env, key, data, doCompress);
+    struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
         return JNI_FALSE;
@@ -794,9 +792,10 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet
  * Method:    natPut
  * Signature: (J[BZ)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut(JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jboolean doCompress) {
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut(
+        JNIEnv *env, jobject me, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    struct entry *newEntry = create_new_entry(env, key, data, doCompress);
+    struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
         return NULL;
@@ -844,4 +843,88 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHist
     (*env)->SetIntArrayRegion(env, histogram, 0, numHistogramEntries, (jint *)ctr);
     free(ctr);
     return maxLen;
+}
+
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetRegion
+ * Signature: (J[BII)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetIntoPreallocated
+  (JNIEnv *env, jobject me, jlong key, jbyteArray target, jint offset) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+    struct entry *e = find_entry(mapdata, key);
+    if (!e)
+        return -1;  // key does not exist
+    int targetSize = (*env)->GetArrayLength(env, target);
+
+    if (offset >= targetSize)
+        return 0;   // offset too big, no data will be copied
+    if (e->compressedSize) {
+        throwAny(env, "Copying from compressed entries not yet implemented");
+        return -2;  // not yet implemented
+    }
+    int length = (offset + e->uncompressedSize > targetSize) ? targetSize - offset : e->uncompressedSize;
+    (*env)->SetByteArrayRegion(env, target, offset, length, (jbyte *)e->data);
+    return length;
+}
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetField
+ * Signature: (JIBB)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetField
+  (JNIEnv *env, jobject me, jlong key, jint fieldNo, jbyte delimiter, jbyte nullIndicator) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+    struct entry *e = find_entry(mapdata, key);
+    if (!e)
+        return (jbyteArray)0;
+    if (e->compressedSize) {
+        throwAny(env, "Copying from compressed entries not yet implemented");
+        return (jbyteArray)0;  // not yet implemented
+    }
+    char *ptr = e->data;
+    char *startOfField = e->data;
+    int bytesLeft = e->uncompressedSize;
+    // search for start of field, until either bytesLeft are exhausted, or
+    while (bytesLeft && fieldNo) {
+        if (*ptr == delimiter) {
+            --fieldNo;
+            startOfField = ++ptr;
+        } else if (*ptr == nullIndicator) {
+//            if (fieldNo == 1)
+//                return (jbyteArray)0;       // found it, it was 0!
+            --fieldNo;
+            startOfField = ++ptr;
+        } else {
+            // any other character
+            ++ptr;
+        }
+        --bytesLeft;
+    }
+    if (!bytesLeft) {
+        if (fieldNo) {
+            // no more bytes, we field is out of bounds. Return null
+            return (jbyteArray)0;
+        }
+        // here: fall through! We are the the field we are looking for, and at the same time at end of message
+    } else {
+        // found the field, and there are bytes left!
+        // scan up to the next delimiter, or next null token, or end of record
+        if (*ptr != delimiter && *ptr == nullIndicator) {
+            return (jbyteArray)0;       // explicit NULL field
+        }
+        while (bytesLeft && *ptr != delimiter && *ptr != nullIndicator) {
+            ++ptr;
+            --bytesLeft;
+        }
+    }
+    int len = ptr - startOfField;
+    // the requested field was the last one in the object. We return a new byte array
+    jbyteArray result = (*env)->NewByteArray(env, len);
+    if (len)
+        (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte *) startOfField);
+    return result;
 }

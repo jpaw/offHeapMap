@@ -1,5 +1,7 @@
 package de.jpaw.offHeap;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -11,6 +13,7 @@ import org.testng.annotations.Test;
 public class OffHeapMapTest {
     static public final String TEXT = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet";
     static public final long KEY = 437L;
+    static public Charset defCS = StandardCharsets.UTF_8;
     
     public void runOpenCloseTest() {
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
@@ -113,5 +116,42 @@ public class OffHeapMapTest {
         
         myMap.close();
     }
+    
+    public void regionTransfers() {
+        int len;
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
+        myMap.set(KEY,  "4444".getBytes(defCS));
+        byte [] buffer = "xxxxxxxxxx".getBytes(defCS);
+        
+        len = myMap.getIntoBuffer(KEY, buffer, 3);
+        System.out.println("Buffer is " + new String(buffer, defCS));
+        assert(Arrays.equals(buffer, "xxx4444xxx".getBytes(defCS)));
+        assert(len == 4);
+        
+        len = myMap.getIntoBuffer(KEY, buffer, 8);
+        System.out.println("Buffer is " + new String(buffer, defCS));
+        assert(Arrays.equals(buffer, "xxx4444x44".getBytes(defCS)));
+        assert(len == 2);
+        
+        myMap.close();
+        
+    }
 
+    public void getField() {
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
+        myMap.set(KEY,  ";hello;world;;field4;@@field7;end".getBytes(defCS));
+        String [] expected = { "", "hello", "world", "", "field4", null, null, "field7", "end", null, null };
+        
+        for (int i = 0; i <= 10; ++i) {
+            byte[] word = myMap.getField(KEY, i, (byte)';', (byte)'@');
+            System.out.println("Word " + i + " is " + (word == null ? "NULL" : new String(word, defCS)));
+            
+            if (expected[i] == null)
+                assert(word == null);
+            else
+                assert(word != null && expected[i].equals(new String(word, defCS)));
+        }
+        
+        myMap.close();
+    }
 }

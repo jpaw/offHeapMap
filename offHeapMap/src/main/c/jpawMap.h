@@ -90,26 +90,18 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natR
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natSet
- * Signature: (JJ[BZ)Z
- */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet
-  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jboolean);
-
-/*
- * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
- * Method:    natStoreRegion
  * Signature: (JJ[BIIZ)Z
  */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natStoreRegion
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natSet
   (JNIEnv *, jobject, jlong, jlong, jbyteArray, jint, jint, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natPut
- * Signature: (JJ[BZ)[B
+ * Signature: (JJ[BIIZ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natPut
-  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jboolean);
+  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jint, jint, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
@@ -118,6 +110,30 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natP
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHistogram
   (JNIEnv *, jobject, jintArray);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetIntoPreallocated
+ * Signature: (J[BI)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetIntoPreallocated
+  (JNIEnv *, jobject, jlong, jbyteArray, jint);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetRegion
+ * Signature: (JII)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetRegion
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetField
+ * Signature: (JIBB)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetField
+  (JNIEnv *, jobject, jlong, jint, jbyte, jbyte);
 
 #ifdef __cplusplus
 }
