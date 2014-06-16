@@ -117,7 +117,7 @@ public class OffHeapMapTest {
         myMap.close();
     }
     
-    public void regionTransfers() {
+    public void storeIntoBufferTransfer() {
         int len;
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
         myMap.set(KEY,  "4444".getBytes(defCS));
@@ -152,6 +152,36 @@ public class OffHeapMapTest {
                 assert(word != null && expected[i].equals(new String(word, defCS)));
         }
         
+        myMap.close();
+    }
+    
+    public void getRegionTest() {
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
+        byte [] data = "John likes to play foo bar with his dog".getBytes(defCS);
+        myMap.set(KEY, data);
+
+        // test inner part
+        byte [] playFooBar = myMap.getRegion(KEY, 14, 12);
+        assert(playFooBar != null);
+        assert(new String(playFooBar, defCS).equals("play foo bar"));
+
+        // test exceeding end of object
+        byte [] withHisDogAndMore = myMap.getRegion(KEY, 27, 50);
+        assert(withHisDogAndMore != null);
+        assert(new String(withHisDogAndMore, defCS).equals("with his dog"));
+
+        
+        myMap.setFromBuffer(KEY+1L, data, 14, 12);
+        byte [] playFooBar2 = myMap.get(KEY+1L);
+        assert(playFooBar2 != null);
+        assert(new String(playFooBar2, defCS).equals("play foo bar"));
+
+        // test exceeding end of object: throws illegal argument exception (caught by Java)
+//        myMap.setFromBuffer(KEY+2L, data, 27, 50);
+//        byte [] withHisDogAndMore2 = myMap.get(KEY+2L);
+//        assert(withHisDogAndMore2 != null);
+//        assert(new String(withHisDogAndMore2, defCS).equals("with his dog"));
+
         myMap.close();
     }
 }

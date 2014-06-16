@@ -872,6 +872,29 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetInto
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
+ * Method:    natGetRegion
+ * Signature: (JII)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetRegion
+  (JNIEnv *env, jobject me, jlong key, jint offset, jint length) {
+    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
+    struct entry *e = find_entry(mapdata, key);
+    if (!e)
+        return (jbyteArray)0;
+    if (e->compressedSize) {
+        throwAny(env, "Copying from compressed entries not yet implemented");
+        return (jbyteArray)0;  // not yet implemented
+    }
+    char *ptr = e->data;
+    int len = offset >= e->uncompressedSize ? 0 : offset + length <= e->uncompressedSize ? length : e->uncompressedSize - offset;
+    jbyteArray result = (*env)->NewByteArray(env, len);
+    if (len)
+        (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte *)e->data + offset);
+    return result;
+}
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natGetField
  * Signature: (JIBB)[B
  */

@@ -209,7 +209,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     /** Stores an entry in the map, specified by a region within a byte array.
      * The new data will be compressed if it is bigger than the threshold passed in map creation.
      * Deleting an entry can be done by passing null as the data pointer. */
-    public void storeRegion(long key, byte [] data, int offset, int length) {
+    public void setFromBuffer(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
         natSet(myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
