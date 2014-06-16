@@ -34,10 +34,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClose
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
  * Method:    natClear
- * Signature: ()V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMap
@@ -211,6 +211,14 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natDebugRedoLog
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natDebugRedoLog
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

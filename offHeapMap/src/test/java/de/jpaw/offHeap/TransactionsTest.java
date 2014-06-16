@@ -53,4 +53,35 @@ public class TransactionsTest {
         myMap.close();
         tx1.close();
     }
+
+    public void runTxClearTest() throws Exception {
+        OffHeapTransaction tx1 = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
+        Shard s1 = new Shard();
+        s1.setOwningTransaction(tx1);
+        
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000, s1, OffHeapTransaction.TRANSACTIONAL);
+        myMap.set(KEY, b1);
+        tx1.commit();
+        myMap.set(KEY, b2);
+        myMap.set(KEY+1L, b3);
+        assert(myMap.size() == 2);
+        doAssert(myMap, b2);
+        myMap.clear();
+        assert(myMap.size() == 0);
+        tx1.printRedoLog();
+        tx1.rollback();
+        assert(myMap.size() == 1);
+        doAssert(myMap, b1);
+        
+        myMap.clear();
+        tx1.commit();
+        assert(myMap.size() == 0);
+        tx1.rollback();
+        assert(myMap.size() == 0);
+       
+        myMap.close();
+        tx1.close();
+    }
+
+
 }

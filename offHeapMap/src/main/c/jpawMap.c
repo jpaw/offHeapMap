@@ -56,6 +56,9 @@ struct tx_log_entry {
 #define REDOLOG_SYNC 0x04      // allow replaying on a different database - safe
 #define AS_PER_TRANSACTION (-1)   // no override in map
 
+
+#define IS_TRANSACTIONAL(ctx, mapdata)  ((ctx) && (mapdata)->modes != 0 && (ctx)->modes != 0)
+
 struct tx_log_list {
     struct tx_log_entry entries[TX_LOG_ENTRIES_PER_CHUNK_LV2];
 };
@@ -317,9 +320,29 @@ void rollback(struct tx_log_entry *e) {
 }
 
 
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natDebugRedoLog
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natDebugRedoLog
+  (JNIEnv *env, jobject me) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) ((*env)->GetLongField(env, me, javaTxCStructFID));
+    int currentEntries = hdr->number_of_changes;
+    int i;
+    for (i = 0; i < currentEntries; ++i) {
+        struct tx_log_list *chunk = hdr->chunks[i >> 8];
+        struct tx_log_entry *loge = &chunk->entries[i & 0xff];
+        jlong key = loge->new_entry ? loge->new_entry->key : loge->old_entry->key;
+        fprintf(stderr, "redo log entry %5d is for key %16ld: old=%16p, new=%16p\n", i, key, loge->old_entry, loge->new_entry);
+    }
+}
+
+
+
 /** Record a row change. Returns an error if anything went wrong. */
 char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *oldData, struct entry *newData) {
-    if (!ctx || mapdata->modes == 0 || !ctx->modes) {
+    if (!IS_TRANSACTIONAL(ctx, mapdata)) {
         // no transaction log. Maybe free old data
         if (oldData)
             free(oldData);
@@ -339,7 +362,7 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
     }
     struct tx_log_entry *loge = &(chunk->entries[ctx->number_of_changes & 0xff]);
 #ifdef DEBUG
-    fprintf(stderr, "Storing rollback data at %16pp: map=%16pp old=%16pp new=%16pp\n", loge, mapdata, oldData, newData);
+    fprintf(stderr, "Storing rollback data %6d at %16p: map=%16p old=%16p new=%16p\n", ctx->number_of_changes, loge, mapdata, oldData, newData);
 #endif
     loge->affected_table = mapdata;
     loge->old_entry = oldData;
@@ -481,10 +504,25 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetSize
  * Method:    natClear
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(JNIEnv *env, jobject me) {
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natClear(JNIEnv *env, jobject me, jlong ctxAsLong) {
     // Get the int given the Field ID
     struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
-    clear(mapdata->data, mapdata->hashTableSize);
+    struct tx_log_hdr *ctx = (struct tx_log_hdr *)ctxAsLong;
+    if (!IS_TRANSACTIONAL(ctx, mapdata)) {
+        // this is faster
+        clear(mapdata->data, mapdata->hashTableSize);
+    } else {
+        int hash;
+        for (hash = 0; hash < mapdata->hashTableSize; ++hash) {
+            struct entry *e;
+            for (e = mapdata->data[hash]; e; e = e->nextSameHash) {
+#ifdef DEBUG
+                fprintf(stderr, "Transactional clear of entry %16p in hash slot %d\n", e, hash);
+#endif
+                record_change(ctx, mapdata, e, NULL);
+            }
+        }
+    }
     memset(mapdata->data, 0, mapdata->hashTableSize * sizeof(struct entry *));     // set the initial pointers to NULL
     mapdata->count = 0;
 }

@@ -11,11 +11,6 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  */
 public class OffHeapTransaction {
-//    private static final int MAX_TRANSACTIONS = 127;     // transactions are intended to be reused. They should never be discarded.
-//    static {
-//        natCreateBuffers(MAX_TRANSACTIONS);
-//    }
-//    private static final AtomicInteger transactionId = new AtomicInteger(0);// the magic number of this transaction
     private static final AtomicLong transactionRef = new AtomicLong(0L);    // the previous system change number
     
     // bitmasks for the transaction parameter - if all are 0, no transactions will be done
@@ -50,9 +45,12 @@ public class OffHeapTransaction {
     /** Define a safepoint. */
     private native int natSetSafepoint();
     
+    /** Removes a transaction from memory. */
     private native void natCloseTransaction();
 
-//    private final int myId = transactionId.incrementAndGet();
+    /** Prints a log of the redo / rollback table. For debugging. */
+    private native void natDebugRedoLog();
+    
     /** Only used by native code, to store the off heap address of the structure. */
     protected final long cStruct;
     private int currentMode = 0;
@@ -62,8 +60,6 @@ public class OffHeapTransaction {
     
     public OffHeapTransaction(int initialMode) {
         currentMode = initialMode;
-//        if (myId >= MAX_TRANSACTIONS)
-//            throw new RuntimeException("Too many transactions created. Transactions should be long term resources");
         cStruct = natCreateTransaction(initialMode);
     }
 
@@ -90,5 +86,9 @@ public class OffHeapTransaction {
     }
     public void close() {
         natCloseTransaction();
+    }
+    
+    public void printRedoLog() {
+        natDebugRedoLog();        
     }
 }

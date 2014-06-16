@@ -48,7 +48,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     private native void natClose();
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
-    private native void natClear();
+    private native void natClear(long ctx);
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
     private native boolean natDelete(long ctx, long key);
@@ -146,9 +146,7 @@ public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, 
     /** Deletes all entries from the map, but keeps the map structure itself. */
     @Override
     public void clear() {
-        if (myShard != Shard.TRANSACTIONLESS_DEFAULT_SHARD)
-            throw new RuntimeException("clear() only possible for maps of the transactionless default shard");
-        natClear();
+        natClear(myShard.getTxCStruct());
     }
 
     /** Removes the entry stored for key from the map (if it did exist). */
