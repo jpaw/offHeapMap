@@ -123,6 +123,33 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMap_natGetHist
 }
 #endif
 #endif
+/* Header for class de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator */
+
+#ifndef _Included_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator
+#define _Included_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator
+#ifdef __cplusplus
+extern "C" {
+#endif
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator
+ * Method:    natInit
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator_natInit
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator
+ * Method:    natIterate
+ * Signature: (JJI)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator_natIterate
+  (JNIEnv *, jobject, jlong, jlong, jint);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
 /* Header for class de_jpaw_offHeap_OffHeapTransaction */
 
 #ifndef _Included_de_jpaw_offHeap_OffHeapTransaction

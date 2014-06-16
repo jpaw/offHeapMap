@@ -70,6 +70,9 @@ static jclass javaTxClass;
 static jfieldID javaTxCStructFID;
 static jclass javaMapClass;
 static jfieldID javaMapCStructFID;
+static jclass javaIteratorClass;
+static jfieldID javaIteratorCurrentHashIndexFID;
+static jfieldID javaIteratorCurrentKeyFID;
 
 
 // reference: see http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
@@ -93,6 +96,74 @@ void throwAny(JNIEnv *env, char *msg) {
 jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key);
 struct entry * setPutSub(struct map *mapdata, struct entry *newEntry);
 
+
+// Iterator
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natInit
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator_natInit
+  (JNIEnv *env, jclass myClass) {
+    javaIteratorClass = (*env)->NewGlobalRef(env, myClass); // call to newGlobalRef is required because otherwise jclass is only valid for the current call
+
+    // Get the Field ID of the instance variables "number"
+    javaIteratorCurrentKeyFID = (*env)->GetFieldID(env, javaIteratorClass, "currentKey", "J");
+    if (!javaIteratorCurrentKeyFID) {
+        throwAny(env, "Invoking class must have a field long currentKey");
+        return;
+    }
+    javaIteratorCurrentHashIndexFID = (*env)->GetFieldID(env, javaIteratorClass, "currentHashIndex", "I");
+    if (!javaIteratorCurrentHashIndexFID) {
+        throwAny(env, "Invoking class must have a field int currentHashIndex");
+        return;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Iterator INIT complete. key FID is %d, hashIndex FID is %d\n", (int)javaIteratorCurrentKeyFID, (int)javaIteratorCurrentHashIndexFID);
+#endif
+}
+
+/*
+ * Class:     de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator
+ * Method:    natIterate
+ * Signature: (JJ)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_LongToByteArrayOffHeapMapEntryIterator_natIterate
+  (JNIEnv *env, jobject myClass, jlong mapAsLong, jlong nextEntryPtr, jint hashIndex) {
+    struct map *mapdata = (struct map *)mapAsLong;
+    struct entry *e = (struct entry *)nextEntryPtr;
+#ifdef DEBUG
+    fprintf(stderr, "iterate on map %16p (has %d entries in %d slots)\n", mapdata, mapdata->count, mapdata->hashTableSize);
+#endif
+    if (e) {
+        e = e->nextSameHash;
+        if (e) {
+            // update Key, but not slot
+#ifdef DEBUG
+            fprintf(stderr, "Found an entry with key %ld in same slot %d\n", (long)(e->key), hashIndex);
+#endif
+            (*env)->SetLongField(env, myClass, javaIteratorCurrentKeyFID, e->key);
+            return (jlong)e;
+        }
+    }
+
+    // need a new slot for the next entry
+    // must search for an entry in the next slot...
+    while (++hashIndex < mapdata->hashTableSize) {
+        e = mapdata->data[hashIndex];
+        if (e) {
+            // found an entry. Store this new hashIndex and return the entry
+#ifdef DEBUG
+            fprintf(stderr, "Found an entry with key %ld in new slot %d\n", (long)(e->key), hashIndex);
+#endif
+            (*env)->SetIntField(env, myClass, javaIteratorCurrentHashIndexFID, hashIndex);
+            (*env)->SetLongField(env, myClass, javaIteratorCurrentKeyFID, e->key);
+            return (jlong)e;
+        }
+    }
+    // no further entry found. must be at end
+    return (jlong)0;
+}
 
 // transactions
 
@@ -221,7 +292,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
 
 void rollback(struct tx_log_entry *e) {
 #ifdef DEBUG
-    fprintf(stderr, "Rolling back entry for %016p %016p %016p\n", e->affected_table, e->old_entry, e->new_entry);
+    fprintf(stderr, "Rolling back entry for %16p %16p %16p\n", e->affected_table, e->old_entry, e->new_entry);
 #endif
     if (!e->old_entry) {
         // was an insert
@@ -234,11 +305,11 @@ void rollback(struct tx_log_entry *e) {
     } else {
         // replace or delete
 #ifdef DEBUG
-        fprintf(stderr, "    => insert / update %016p with key %ld\n", e->old_entry, e->old_entry->key);
+        fprintf(stderr, "    => insert / update %16p with key %ld\n", e->old_entry, e->old_entry->key);
 #endif
         struct entry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);  // TODO: assert we got the new entry (NULL or not)
         if (shouldBeNew != e->new_entry)
-            fprintf(stderr, "ROLLBACK PROBLEM: expected to get %016p, but got %016p for key %ld\n", e->new_entry, shouldBeNew, e->old_entry->key);
+            fprintf(stderr, "ROLLBACK PROBLEM: expected to get %16p, but got %16p for key %ld\n", e->new_entry, shouldBeNew, e->old_entry->key);
         // if new_entry was not null, then free it (it is no longer required)
         if (e->new_entry)
             free(e->new_entry);
@@ -268,7 +339,7 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
     }
     struct tx_log_entry *loge = &(chunk->entries[ctx->number_of_changes & 0xff]);
 #ifdef DEBUG
-    fprintf(stderr, "Storing rollback data at %016p: map=%016p old=%016p new=%016p\n", loge, mapdata, oldData, newData);
+    fprintf(stderr, "Storing rollback data at %16pp: map=%16pp old=%16pp new=%16pp\n", loge, mapdata, oldData, newData);
 #endif
     loge->affected_table = mapdata;
     loge->old_entry = oldData;
@@ -513,6 +584,9 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
             } else {
                 prev->nextSameHash = e->nextSameHash;
             }
+#ifdef DEBUG
+            fprintf(stderr, "Removing an entry of key %ld in slot %d\n", (long)key, hash);
+#endif
             record_change(ctx, mapdata, e, NULL);
             --mapdata->count;
             return JNI_TRUE;
@@ -521,6 +595,9 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
         e = e->nextSameHash;
     }
     // not found. No change of size
+#ifdef DEBUG
+    fprintf(stderr, "Not removing an entry of key %ld in slot %d (does not exist)\n", (long)key, hash);
+#endif
     return JNI_FALSE;
 }
 
@@ -625,7 +702,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jboolean
 struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
 //    struct map *mapdata = (struct map *) ((*env)->GetLongField(env, me, javaMapCStructFID));
 //    struct entry *newEntry = create_new_entry(env, data, doCompress);
-    int key = newEntry->key;
+    jlong key = newEntry->key;
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *e = mapdata->data[hash];
     newEntry->nextSameHash = e;  // insert it at the start
@@ -638,12 +715,18 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
         if (e->key == key) {
             // replace that entry by the new one
             prev->nextSameHash = e->nextSameHash;
+#ifdef DEBUG
+            fprintf(stderr, "Replacing an entry of key %ld in slot %d\n", (long)key, hash);
+#endif
             return e;
         }
         prev = e;
         e = e->nextSameHash;
     }
     // this is a new entry
+#ifdef DEBUG
+    fprintf(stderr, "Inserting an entry of key %ld in slot %d\n", (long)key, hash);
+#endif
     ++mapdata->count;
     return NULL;
 }

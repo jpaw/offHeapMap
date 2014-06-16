@@ -1,13 +1,16 @@
 package de.jpaw.offHeap;
 
 import java.io.PrintStream;
+import java.util.Iterator;
+
+import de.jpaw.collections.PrimitiveLongKeyMap;
 
 /** Implements a long -> byte [] hash map off heap, using JNI.
  * null values cannot be stored in the map (as they are used to indicate a missing entry, but zero-length byte arrays can.
  * Zero length arrays are therefore never compressed.
  * 
  *  This implementation is not thread-safe. */
-public class LongToByteArrayOffHeapMap {
+public class LongToByteArrayOffHeapMap implements PrimitiveLongKeyMap<byte []>, Iterable<PrimitiveLongKeyMap.Entry<byte []>> {
     /** Internal state to indicate if the native libraries have been loaded. It is false after the class has been initialized
      * and will be set to true once the first map should be created.
      */
@@ -82,8 +85,6 @@ public class LongToByteArrayOffHeapMap {
      * Chains of bigger length are not counted. The method returns the longest chain length. */
     private native int natGetHistogram(int [] chainsOfLength);
     
-    
-    
     //
     // External API, as a wrapper to the internal native one.
     // The Java methods maintain the current size, in order to allow fast access to it from Java without the need to perform a JNI call.
@@ -98,7 +99,7 @@ public class LongToByteArrayOffHeapMap {
         myShard = forShard; 
         synchronized (isInitialized) {
             if (!isInitialized) {
-                OffHeapTransaction.init();
+                OffHeapInit.init();
                 natInit();
                 // now we are (unless an Exception was thrown)
                 isInitialized = Boolean.TRUE;
@@ -114,6 +115,7 @@ public class LongToByteArrayOffHeapMap {
     }
     
     /** Returns the number of entries currently in the map. */
+    @Override
     public int size() {
         return natGetSize();
     }
@@ -142,6 +144,7 @@ public class LongToByteArrayOffHeapMap {
     }
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
+    @Override
     public void clear() {
         if (myShard != Shard.TRANSACTIONLESS_DEFAULT_SHARD)
             throw new RuntimeException("clear() only possible for maps of the transactionless default shard");
@@ -149,18 +152,15 @@ public class LongToByteArrayOffHeapMap {
     }
 
     /** Removes the entry stored for key from the map (if it did exist). */
+    @Override
     public void delete(long key) {
         natDelete(myShard.getTxCStruct(), key);
     }
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
+    @Override
     public byte [] get(long key) {
         return natGet(key);
-    }
-    
-    /** Returns true if an entry is stored for key (i.e. get(key) would return non null), and false otherwise. */
-    public boolean test(long key) {
-        return natLength(key) >= 0;
     }
     
     /** Returns the length of a stored entry, or -1 if no entry is stored. */
@@ -176,6 +176,7 @@ public class LongToByteArrayOffHeapMap {
     /** Stores an entry in the map.
      * The new data will be compressed if it is bigger than the threshold passed in map creation.
      * Deleting an entry can be done by passing null as the data pointer. */
+    @Override
     public void set(long key, byte [] data) {
         if (data == null) {
             delete(key);
@@ -186,6 +187,7 @@ public class LongToByteArrayOffHeapMap {
     
     /** Stores an entry in the map and returns the previous entry, or null if there was no prior entry for this key.
      * Deleting an entry can be done by passing null as the data pointer. */
+    @Override
     public byte [] put(long key, byte [] data) {
         if (data == null) {
             return natRemove(myShard.getTxCStruct(), key);
@@ -213,5 +215,33 @@ public class LongToByteArrayOffHeapMap {
         out.println("Currently " + size() + " entries are stored, with maximum chain length " + maxChainLen);
         for (int i = 0; i < len; ++i)
             out.println(String.format("%6d Chains of length %3d", histogram[i], i));
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return size() == 0;
+    }
+
+    /** Returns true if an entry is stored for key (i.e. get(key) would return non null), and false otherwise. */
+    @Override
+    public boolean containsKey(long key) {
+        return natLength(key) >= 0;
+    }
+
+    @Override
+    public byte[] remove(long key) {
+        return natRemove(myShard.getTxCStruct(), key);
+    }
+
+    @Override
+    public void putAll(PrimitiveLongKeyMap<? extends byte[]> otherMap) {
+        for (PrimitiveLongKeyMap.Entry<? extends byte[]> otherEntry : otherMap) {
+            set(otherEntry.getKey(), otherEntry.getValue());
+        }
+    }
+
+    @Override
+    public Iterator<PrimitiveLongKeyMap.Entry<byte[]>> iterator() {
+        return new LongToByteArrayOffHeapMapEntryIterator(this, cStruct);
     }
 }

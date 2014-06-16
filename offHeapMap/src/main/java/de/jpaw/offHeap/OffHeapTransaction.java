@@ -28,12 +28,8 @@ public class OffHeapTransaction {
     //
     
     static {
-        System.loadLibrary("lz4");      // Load native library at runtime
-        System.loadLibrary("jpawMap");  // Load native library at runtime
+        OffHeapInit.init();
         natInit();
-    }
-    public static void init() {
-        // just a hook to perform the init
     }
     
     /** Register globals. */

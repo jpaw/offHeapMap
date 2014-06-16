@@ -6,7 +6,7 @@ import org.testng.annotations.Test;
 
 @Test
 public class TransactionsTest {
-    static public final Long KEY = 437L;
+    static public final long KEY = 437L;
     static public final byte [] b1 = "1 One".getBytes();
     static public final byte [] b2 = "2 Two".getBytes();
     static public final byte [] b3 = "3 Three".getBytes();
