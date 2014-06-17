@@ -29,6 +29,7 @@ public class StringMapTest {
 
         myMap.forEach(kvp -> System.out.println(String.format("Element is %d,%s", kvp.getKey(), kvp.getValue())));
         
+        myMap.writeToFile("/tmp/testDB.ohm");
         myMap.close();
     }
 

@@ -1,9 +1,12 @@
 package de.jpaw.offHeap;
 
 import java.io.PrintStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import de.jpaw.collections.DatabaseIO;
 import de.jpaw.collections.PrimitiveLongKeyMap;
 
 /** Implements a long -> byte [] hash map off heap, using JNI.
@@ -13,7 +16,7 @@ import de.jpaw.collections.PrimitiveLongKeyMap;
  * This class should be inherited in order to create specific implementations fir fixed types of V, while the native implementation is fixed to byte arrays.
  * 
  *  This implementation is not thread-safe. */
-public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements PrimitiveLongKeyMap<V> {
+public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements PrimitiveLongKeyMap<V>, DatabaseIO {
     
     static {
         OffHeapInit.init();
@@ -48,6 +51,12 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
     private native void natClear(long cMap, long ctx);
+
+    /** Dump the full database contents to a disk file. */
+    private native void natWriteToFile(long cMap, byte [] pathname);
+    
+    /** Read a database from disk. The database should be empty before. */
+    private native void natReadFromFile(long cMap, byte [] pathname);
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
     private native boolean natDelete(long cMap, long ctx, long key);
@@ -118,6 +127,18 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     }
     public AbstractPrimitiveLongKeyOffHeapMap(int size) {
         this(size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, 0);
+    }
+    
+    /** Dump the full database contents to a disk file. */
+    @Override
+    public void writeToFile(String pathname, Charset filenameEncoding) {
+        natWriteToFile(cStruct, pathname.getBytes(filenameEncoding == null ? DEFAULT_FILENAME_ENCODING : filenameEncoding));
+    }
+    
+    /** Read a database from disk. The database should be empty before. */
+    @Override
+    public void readFromFile(String pathname, Charset filenameEncoding) {
+        natReadFromFile(cStruct, pathname.getBytes(filenameEncoding == null ? DEFAULT_FILENAME_ENCODING : filenameEncoding));
     }
     
     /** Returns the number of entries currently in the map. */

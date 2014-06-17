@@ -41,6 +41,22 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Method:    natWriteToFile
+ * Signature: (J[B)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natWriteToFile
+  (JNIEnv *, jobject, jlong, jbyteArray);
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Method:    natReadFromFile
+ * Signature: (J[B)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natReadFromFile
+  (JNIEnv *, jobject, jlong, jbyteArray);
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
  * Method:    natDelete
  * Signature: (JJJ)Z
  */
@@ -139,6 +155,17 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHea
 }
 #endif
 #endif
+/* Header for class de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntry */
+
+#ifndef _Included_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntry
+#define _Included_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntry
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifdef __cplusplus
+}
+#endif
+#endif
 /* Header for class de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntryIterator */
 
 #ifndef _Included_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntryIterator
@@ -154,17 +181,6 @@ extern "C" {
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
   (JNIEnv *, jobject, jlong, jlong, jint);
 
-#ifdef __cplusplus
-}
-#endif
-#endif
-/* Header for class de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntry */
-
-#ifndef _Included_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntry
-#define _Included_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_PrimitiveLongKeyOffHeapMapEntry
-#ifdef __cplusplus
-extern "C" {
-#endif
 #ifdef __cplusplus
 }
 #endif

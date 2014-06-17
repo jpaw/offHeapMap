@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <jni.h>
 #include <lz4.h>
 #include "jpawMap.h"
@@ -8,31 +10,37 @@
 #define USE_CRITICAL_FOR_STORE
 // #define USE_CRITICAL_FOR_RETRIEVAL       // this seems to be much slower!
 
-#undef SEPARATE_COMMITTED_VIEW
+#define SEPARATE_COMMITTED_VIEW
 
 #undef DEBUG
 //#define DEBUG
 
+
+
+// round the size to be allocated to the next multiple of 16, because malloc anyway returns multiples of 16.
+#define ROUND_UP_SIZE(size)     ((((size) - 1) & ~0x0f) + 16)
+
 struct entry {
-    int uncompressedSize;
-    int compressedSize;  // 0 = is not compressed
-    jlong key;
+    // start with the internal ptr, to allow writing a continuous area when dumping the file.
     struct entry *nextSameHash;
 #ifdef SEPARATE_COMMITTED_VIEW
     struct entry *nextInCommittedView;
 #endif
+    // from here, the entry is dumped to disk on saves.
+    int uncompressedSize;       // size of the data, without this header portion
+    int compressedSize;         // 0 = is not compressed, otherwise size of the compressed output. The actual allocated space is rounded up such that the entry size is always a multiple of 16
+    jlong key;
     char data[];
 };
 
 struct map {
+    struct entry **data;
     int hashTableSize;
-    int modes;
+    int modes;              // 00 = not transactional, -1 = take mode of transaction, 1 = TRANSACTIONAL
     int count;              // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
     int padding;
-    struct entry **data;
-#ifdef SEPARATE_COMMITTED_VIEW
-    struct entry **committedViewData;
-#endif
+    long lastCommittedRef;
+    struct map *committedView;  // same data, but synched after commit (to provide secondary view for read/only queries)
 };
 
 // stores a single modification of the maps.
@@ -77,10 +85,7 @@ static jfieldID javaIteratorCurrentKeyFID;
 // reference: see http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
 
 
-// round the size to be allocated to the next multiple of 16, because malloc anyway returns multiples of 16.
-int round_up_size(int size) {
-    return ((size - 1) & ~0x0f) + 16;
-}
+
 
 void throwOutOfMemory(JNIEnv *env) {
     jclass exceptionCls = (*env)->FindClass(env, "java/lang/RuntimeException");
@@ -392,13 +397,15 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_
     }
     mapdata->hashTableSize = size;
     mapdata->modes = mode;
-    mapdata->data = calloc(size, sizeof(struct entry *));
     mapdata->count = 0;
     mapdata->padding = 0;
+    mapdata->lastCommittedRef = -1L;
+    mapdata->data = calloc(size, sizeof(struct entry *));
     if (!mapdata->data) {
         throwOutOfMemory(env);
         return 0L;
     }
+    mapdata->committedView = NULL;  // TODO: for now it's not yet used...
 
     // printf("jpawMap: created new map at %p\n", mapdata);
     return (jlong) mapdata;
@@ -634,7 +641,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
     struct entry *e;
     if (doCompress) {
         // compress the data. Allocate a target buffer
-        int max_compressed_length = round_up_size(LZ4_compressBound(length));
+        int max_compressed_length = ROUND_UP_SIZE(LZ4_compressBound(length));
         struct entry *tmp_dst = malloc(sizeof(struct entry) + max_compressed_length);
         if (!tmp_dst) {
             return NULL;  // will throw OOM
@@ -661,7 +668,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
         (*env)->ReleasePrimitiveArrayCritical(env, data, src, JNI_ABORT);  // abort, as we did not change anything
 #endif
         // TODO: if the uncompressed size needs the same space (or less) than the compressed, use the uncompressed form instead!
-        int actual_rounded_length = round_up_size(actual_compressed_length);
+        int actual_rounded_length = ROUND_UP_SIZE(actual_compressed_length);
         // if we need less than initially allocated, realloc to free the space.
         if (actual_rounded_length < max_compressed_length) {
             e = realloc(tmp_dst, sizeof(struct entry) + actual_rounded_length);
@@ -673,7 +680,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
         e->uncompressedSize = length;
         e->compressedSize = actual_compressed_length;
     } else {
-        e = (struct entry *)malloc(sizeof(struct entry) + round_up_size(length));
+        e = (struct entry *)malloc(sizeof(struct entry) + ROUND_UP_SIZE(length));
         if (!e)
             return NULL;  // will throw OOM
         e->uncompressedSize = length;
@@ -897,4 +904,112 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHea
     if (len)
         (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte *) startOfField);
     return result;
+}
+
+
+
+struct filedumpHeader {
+    int magicNumber;
+    int numberOfRecords;
+    long totalSize;
+    long lastCommittedRef;
+};
+
+
+// buffer size calculation:
+// we want to achieve the magnitide of the advertised 500 MB / s write speed.
+// SSD write latency is about 3 ms (333 ops / second), or a buffer size of 1.5 MB.
+// let's allocate about 2 megs then.  This just happens to be a hugepage on x86_64.
+// all entries in the file will be 8-byte aligned, padded by 0xee
+#define FILEDUMP_BUFFER_SIZE    (2 * 1024 * 1024)
+
+// upon input, [0, FILEDUMP_BUFFER_SIZE] bytes are occupied, i.e. the first iteration possibly only writes 0 bytes
+int transferWrite(const int fd, char *buffer, int oldOffset, void const *src, int len) {
+    while (len > 0) {
+        if (oldOffset + len < FILEDUMP_BUFFER_SIZE) {
+            // copy all and, still space left
+            memcpy(buffer + oldOffset, src, len);
+            // possibly align by multipes of 8
+            if (len & 7) {
+                char *p = buffer+oldOffset+len;
+                do {
+                    *p++ = 0xee;
+                } while (++len & 7);
+            }
+            return oldOffset + len;
+        }
+        // copy data and we reach end of buffer with that. Flush the buffer and loop
+        int portion = FILEDUMP_BUFFER_SIZE - oldOffset;
+        memcpy(buffer + oldOffset, src, portion);
+        write(fd, buffer, FILEDUMP_BUFFER_SIZE);  // TODO error check later
+        src += portion;
+        oldOffset = 0;
+        len -= portion;
+    }
+    return oldOffset;
+}
+/*
+ * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Method:    natWriteToFile
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natWriteToFile
+  (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename) {
+    struct filedumpHeader hdr;
+    struct map *mapdata = (struct map *) cMap;
+#ifdef _ISOC11_SOURCE
+    char *buffer = aligned_alloc(4 * 1024, FILEDUMP_BUFFER_SIZE);  // needs _ISOC11_SOURCE
+#else
+    char *buffer = malloc(FILEDUMP_BUFFER_SIZE);
+#endif
+    if (!buffer) {
+        throwOutOfMemory(env);
+        return;
+    }
+    int filenameLen = (*env)->GetArrayLength(env, filename);
+    char *filenameBuffer = malloc(filenameLen+1);
+    if (!filenameBuffer) {
+        free(buffer);
+        throwOutOfMemory(env);
+        return;
+    }
+    (*env)->GetByteArrayRegion(env, filename, 0, filenameLen, (jbyte *)filenameBuffer);
+    filenameBuffer[filenameLen] = 0;
+
+    int fd = open(filenameBuffer, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+
+    // transfer header
+    hdr.magicNumber = 0x283462FE;
+    hdr.numberOfRecords = mapdata->count;
+    hdr.lastCommittedRef = mapdata->lastCommittedRef;
+    hdr.totalSize = 0L;  // findSize(mapdata)
+
+    int bufferOffset = transferWrite(fd, buffer, 0, &hdr, sizeof(hdr));
+    // write the entries
+    int i;
+    for (i = 0; i < mapdata->hashTableSize; ++i) {
+        struct entry *e;
+        for (e = mapdata->data[i]; e; e = e->nextSameHash) {
+            int rawSize = e->compressedSize ? e->compressedSize : e->uncompressedSize;
+            int finalSize = 2 * sizeof(int) + sizeof(jlong) + rawSize;
+            bufferOffset = transferWrite(fd, buffer, bufferOffset, &(e->uncompressedSize), finalSize);
+        }
+    }
+
+    if (bufferOffset) {
+        write(fd, buffer, bufferOffset);
+    }
+    close(fd);
+    free(filenameBuffer);
+    free(buffer);
+}
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Method:    natReadFromFile
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natReadFromFile
+  (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename) {
+
 }
