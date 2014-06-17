@@ -19,6 +19,7 @@
 
 // round the size to be allocated to the next multiple of 16, because malloc anyway returns multiples of 16.
 #define ROUND_UP_SIZE(size)     ((((size) - 1) & ~0x0f) + 16)
+#define ROUND_UP_FILESIZE(size) ((((size) - 1) & ~0x07) + 8)  // as stored in the disk dump file
 
 struct entry {
     // start with the internal ptr, to allow writing a continuous area when dumping the file.
@@ -677,16 +678,16 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
         } else {
             e = tmp_dst;
         }
-        e->uncompressedSize = length;
         e->compressedSize = actual_compressed_length;
     } else {
         e = (struct entry *)malloc(sizeof(struct entry) + ROUND_UP_SIZE(length));
         if (!e)
             return NULL;  // will throw OOM
-        e->uncompressedSize = length;
         e->compressedSize = 0;
         (*env)->GetByteArrayRegion(env, data, offset, length, (jbyte *)e->data);
     }
+    e->uncompressedSize = length;
+    e->nextInCommittedView = NULL;
     e->key = key;
     return e;
 }
@@ -948,6 +949,32 @@ int transferWrite(const int fd, char *buffer, int oldOffset, void const *src, in
     }
     return oldOffset;
 }
+
+char *allocateBuffers(JNIEnv *env, char **buffer, jbyteArray filename) {
+
+#ifdef _ISOC11_SOURCE
+    char *buffer = aligned_alloc(4 * 1024, FILEDUMP_BUFFER_SIZE);  // needs _ISOC11_SOURCE
+#else
+    *buffer = malloc(FILEDUMP_BUFFER_SIZE);
+#endif
+    if (!*buffer) {
+        throwOutOfMemory(env);
+        return NULL;
+    }
+    int filenameLen = (*env)->GetArrayLength(env, filename);
+    char *filenameBuffer = malloc(filenameLen+1);
+    if (!filenameBuffer) {
+        free(buffer);
+        throwOutOfMemory(env);
+        return NULL;
+    }
+    (*env)->GetByteArrayRegion(env, filename, 0, filenameLen, (jbyte *)filenameBuffer);
+    filenameBuffer[filenameLen] = 0;
+    return filenameBuffer;
+}
+
+#define MAGIC_DB_CONSTANT   0x283462FE
+#define ENTRY_HDR_SIZE      (2 * sizeof(int) + sizeof(jlong))
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
  * Method:    natWriteToFile
@@ -957,29 +984,21 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
   (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename) {
     struct filedumpHeader hdr;
     struct map *mapdata = (struct map *) cMap;
-#ifdef _ISOC11_SOURCE
-    char *buffer = aligned_alloc(4 * 1024, FILEDUMP_BUFFER_SIZE);  // needs _ISOC11_SOURCE
-#else
-    char *buffer = malloc(FILEDUMP_BUFFER_SIZE);
-#endif
-    if (!buffer) {
-        throwOutOfMemory(env);
-        return;
-    }
-    int filenameLen = (*env)->GetArrayLength(env, filename);
-    char *filenameBuffer = malloc(filenameLen+1);
-    if (!filenameBuffer) {
-        free(buffer);
-        throwOutOfMemory(env);
-        return;
-    }
-    (*env)->GetByteArrayRegion(env, filename, 0, filenameLen, (jbyte *)filenameBuffer);
-    filenameBuffer[filenameLen] = 0;
+    char *buffer;
 
+    char *filenameBuffer = allocateBuffers(env, &buffer, filename);
+    if (!filenameBuffer)
+        return;  // error
     int fd = open(filenameBuffer, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    free(filenameBuffer);
+    if (fd < 0) {
+        free(buffer);
+        throwAny(env, "Cannot open file");
+        return;
+    }
 
     // transfer header
-    hdr.magicNumber = 0x283462FE;
+    hdr.magicNumber = MAGIC_DB_CONSTANT;
     hdr.numberOfRecords = mapdata->count;
     hdr.lastCommittedRef = mapdata->lastCommittedRef;
     hdr.totalSize = 0L;  // findSize(mapdata)
@@ -1000,7 +1019,6 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
         write(fd, buffer, bufferOffset);
     }
     close(fd);
-    free(filenameBuffer);
     free(buffer);
 }
 
@@ -1011,5 +1029,79 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natReadFromFile
   (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename) {
+    struct filedumpHeader hdr;
+    struct map *mapdata = (struct map *) cMap;
 
+    if (mapdata->count) {
+        throwAny(env, "DB is not empty");
+        return;
+    }
+
+    char *buffer;
+
+    char *filenameBuffer = allocateBuffers(env, &buffer, filename);
+    if (!filenameBuffer)
+        return;  // error
+
+    // use buffered I/O for reading.
+    FILE *fp = fopen(filenameBuffer, "rb");
+    free(filenameBuffer);
+    if (!fp) {
+        throwAny(env, "Cannot open file");
+        free(buffer);
+        return;
+    }
+
+    setvbuf(fp, buffer, _IOFBF, FILEDUMP_BUFFER_SIZE);
+
+    if (fread(&hdr, sizeof(hdr), 1, fp) != 1) {
+        throwAny(env, "Cannot read file header");
+        free(buffer);
+        fclose(fp);
+        return;
+    }
+    if (hdr.magicNumber != MAGIC_DB_CONSTANT) {
+        throwAny(env, "File is not a DB file (bad magic number)");
+        free(buffer);
+        fclose(fp);
+        return;
+    }
+
+    int i;
+    for (i = 0; i < hdr.numberOfRecords; ++i) {
+        // read the entry header: key, uncompressed & compressed size
+        struct entry entryHdr;
+        if (fread(&(entryHdr.uncompressedSize), ENTRY_HDR_SIZE, 1, fp) != 1) {
+            free(buffer);
+            fclose(fp);
+            throwAny(env, "Cannot read entry header");
+            return;
+        }
+        int actualSize = entryHdr.compressedSize ? entryHdr.compressedSize : entryHdr.uncompressedSize;
+        struct entry *e = malloc(sizeof(struct entry) + ROUND_UP_SIZE(actualSize));
+        if (!e) {
+            free(buffer);
+            fclose(fp);
+            throwOutOfMemory(env);
+        }
+        e->key = entryHdr.key;
+        e->uncompressedSize = entryHdr.uncompressedSize;
+        e->compressedSize = entryHdr.compressedSize;
+
+        int hash = computeHash(entryHdr.key, mapdata->hashTableSize);
+        e->nextInCommittedView = NULL;
+        e->nextSameHash = mapdata->data[hash];
+        mapdata->data[hash] = e;
+        if (fread(e->data, ROUND_UP_FILESIZE(actualSize), 1, fp) != 1) {
+            free(buffer);
+            fclose(fp);
+            throwAny(env, "Cannot read entry data");
+            return;
+        }
+        ++mapdata->count;
+    }
+    // mapdata->count = hdr.numberOfRecords;
+    mapdata->lastCommittedRef = hdr.lastCommittedRef;
+    fclose(fp);
+    free(buffer);
 }
