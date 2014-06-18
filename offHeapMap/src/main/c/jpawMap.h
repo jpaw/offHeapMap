@@ -18,10 +18,18 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
  * Method:    natOpen
- * Signature: (II)J
+ * Signature: (IIZ)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natOpen
-  (JNIEnv *, jobject, jint, jint);
+  (JNIEnv *, jobject, jint, jint, jboolean);
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Method:    natGetView
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetView
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
@@ -42,10 +50,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
  * Method:    natWriteToFile
- * Signature: (J[B)V
+ * Signature: (J[BZ)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natWriteToFile
-  (JNIEnv *, jobject, jlong, jbyteArray);
+  (JNIEnv *, jobject, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
@@ -211,10 +219,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: (JJ)I
+ * Signature: (JJZ)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jlong, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction

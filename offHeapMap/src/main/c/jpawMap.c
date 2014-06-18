@@ -99,7 +99,9 @@ void throwAny(JNIEnv *env, char *msg) {
 
 // forwards...
 jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key);
+jboolean execRemoveShadow(struct map *mapdata, jlong key);
 struct entry * setPutSub(struct map *mapdata, struct entry *newEntry);
+struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry);
 
 
 // Iterator
@@ -249,7 +251,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *env, jobject me, jlong cTx, jlong ref) {
+  (JNIEnv *env, jobject me, jlong cTx, jlong ref, jboolean synchronousUpdateCommittedView) {
     // currently no redo logs are written. Therefore just discard the entries
 #ifdef DEBUG
     fprintf(stderr, "COMMIT START\n");
@@ -264,9 +266,33 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
                 // need a new chunk
                 chunk = hdr->chunks[i >> 8];
             }
-            struct entry *e = chunk->entries[i & 0xff].old_entry;
-            if (e)
-                free(e);
+            struct tx_log_entry *ep = &(chunk->entries[i & 0xff]);
+            struct map *view = ep->affected_table->committedView;
+            if (!view) {
+                // no shadow: simple rule: discard old entry.
+                struct entry *e = ep->old_entry;
+                if (e)
+                    free(e);
+            } else {
+                // have secondary view. Do not discard old entry, because we either still need it, or we discard it within a recursive call
+                if (synchronousUpdateCommittedView) {
+                    // we have a view, and are asked to replay the tx on it
+                    if (!ep->new_entry) {
+                        // was a remove => remove it on the view (which frees the old data)
+                        execRemoveShadow(view, ep->old_entry->key);
+                    } else {
+                        // insert or replace
+                        struct entry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
+                        if (shouldBeOld != ep->old_entry)
+                            fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
+                        // if new_entry was not null, then free it (it is no longer required)
+                        if (ep->old_entry)
+                            free(ep->old_entry);
+                    }
+                } else {
+                    // TODO: implement scheduled (delayed) update in another thread
+                }
+            }
         }
     }
     hdr->number_of_changes = 0;
@@ -293,7 +319,7 @@ void rollback(struct tx_log_entry *e) {
 #ifdef DEBUG
         fprintf(stderr, "    => insert / update %16p with key %ld\n", e->old_entry, e->old_entry->key);
 #endif
-        struct entry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);  // TODO: assert we got the new entry (NULL or not)
+        struct entry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);
         if (shouldBeNew != e->new_entry)
             fprintf(stderr, "ROLLBACK PROBLEM: expected to get %16p, but got %16p for key %ld\n", e->new_entry, shouldBeNew, e->old_entry->key);
         // if new_entry was not null, then free it (it is no longer required)
@@ -388,7 +414,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
  * Method:    natOpen
  * Signature: (I)V
  */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natOpen(JNIEnv *env, jobject me, jint size, jint mode) {
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natOpen
+    (JNIEnv *env, jobject me, jint size, jint mode, jboolean withCommittedView) {
     // round up the size to multiples of 32, for the collision indicator
     size = ((size - 1) | 31) + 1;
     struct map *mapdata = malloc(sizeof(struct map));
@@ -401,15 +428,48 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_
     mapdata->count = 0;
     mapdata->padding = 0;
     mapdata->lastCommittedRef = -1L;
+    mapdata->committedView = NULL;
     mapdata->data = calloc(size, sizeof(struct entry *));
     if (!mapdata->data) {
+        free(mapdata);
         throwOutOfMemory(env);
         return 0L;
     }
-    mapdata->committedView = NULL;  // TODO: for now it's not yet used...
+    if (withCommittedView) {
+        struct map *view = malloc(sizeof(struct map));
+        if (!view) {
+            free(mapdata->data);
+            free(mapdata);
+            throwOutOfMemory(env);
+            return 0L;
+        }
+        memcpy(view, mapdata, sizeof(struct map));
+        mapdata->committedView = view;
+
+        view->modes = 0;        // the committed view does not have any TX management
+        view->data = calloc(size, sizeof(struct entry *));
+        if (!view->data) {
+            free(view);
+            free(mapdata->data);
+            free(mapdata);
+            throwOutOfMemory(env);
+            return 0L;
+        }
+    }
 
     // printf("jpawMap: created new map at %p\n", mapdata);
     return (jlong) mapdata;
+}
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Method:    natGetView
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetView
+  (JNIEnv *env, jobject me, jlong cMap) {
+    struct map *mapdata = (struct map *) cMap;
+    return (jlong)mapdata->committedView;
 }
 
 int computeHash(jlong arg, int size) {
@@ -595,6 +655,36 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
     return JNI_FALSE;
 }
 
+// remove an entry for a key. If transactions are active, redo log / rollback info will be stored. Else the entry no longer required will be freed.
+jboolean execRemoveShadow(struct map *mapdata, jlong key) {
+    int hash = computeHash(key, mapdata->hashTableSize);
+    struct entry *prev = NULL;
+    struct entry *e = mapdata->data[hash];
+    while (e) {
+        // check if this is a match
+        if (e->key == key) {
+            if (!prev) {
+                // initial entry, update mapdata
+                mapdata->data[hash] = e->nextInCommittedView;
+            } else {
+                prev->nextSameHash = e->nextInCommittedView;
+            }
+#ifdef DEBUG
+            fprintf(stderr, "Removing a shadow entry of key %ld in slot %d\n", (long)key, hash);
+#endif
+            free(e);
+            --mapdata->count;
+            return JNI_TRUE;
+        }
+        prev = e;
+        e = e->nextInCommittedView;
+    }
+    // not found. No change of size
+#ifdef DEBUG
+    fprintf(stderr, "Not removing a shadow entry of key %ld in slot %d (does not exist)\n", (long)key, hash);
+#endif
+    return JNI_FALSE;
+}
 
 /*
  * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
@@ -718,6 +808,35 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
     // this is a new entry
 #ifdef DEBUG
     fprintf(stderr, "Inserting an entry of key %ld in slot %d\n", (long)key, hash);
+#endif
+    ++mapdata->count;
+    return NULL;
+}
+struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry) {
+    jlong key = newEntry->key;
+    int hash = computeHash(key, mapdata->hashTableSize);
+    struct entry *e = mapdata->data[hash];
+    newEntry->nextInCommittedView = e;  // insert it at the start
+    newEntry->key = key;
+    mapdata->data[hash] = newEntry;
+    struct entry *prev = newEntry;
+
+    while (e) {
+        // check if this is a match
+        if (e->key == key) {
+            // replace that entry by the new one
+            prev->nextInCommittedView = e->nextInCommittedView;
+#ifdef DEBUG
+            fprintf(stderr, "Replacing a shadow entry of key %ld in slot %d\n", (long)key, hash);
+#endif
+            return e;
+        }
+        prev = e;
+        e = e->nextInCommittedView;
+    }
+    // this is a new entry
+#ifdef DEBUG
+    fprintf(stderr, "Inserting a shadow entry of key %ld in slot %d\n", (long)key, hash);
 #endif
     ++mapdata->count;
     return NULL;
@@ -981,7 +1100,7 @@ char *allocateBuffers(JNIEnv *env, char **buffer, jbyteArray filename) {
  * Signature: (JLjava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natWriteToFile
-  (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename) {
+  (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename, jboolean fromCommittedView) {
     struct filedumpHeader hdr;
     struct map *mapdata = (struct map *) cMap;
     char *buffer;
@@ -997,6 +1116,11 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
         return;
     }
 
+    if (!mapdata->committedView)
+        fromCommittedView = JNI_FALSE;
+    if (fromCommittedView)
+        mapdata = mapdata->committedView;
+
     // transfer header
     hdr.magicNumber = MAGIC_DB_CONSTANT;
     hdr.numberOfRecords = mapdata->count;
@@ -1008,7 +1132,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
     int i;
     for (i = 0; i < mapdata->hashTableSize; ++i) {
         struct entry *e;
-        for (e = mapdata->data[i]; e; e = e->nextSameHash) {
+        for (e = mapdata->data[i]; e; e = (fromCommittedView ? e->nextInCommittedView : e->nextSameHash)) {
             int rawSize = e->compressedSize ? e->compressedSize : e->uncompressedSize;
             int finalSize = 2 * sizeof(int) + sizeof(jlong) + rawSize;
             bufferOffset = transferWrite(fd, buffer, bufferOffset, &(e->uncompressedSize), finalSize);
@@ -1089,8 +1213,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
         e->compressedSize = entryHdr.compressedSize;
 
         int hash = computeHash(entryHdr.key, mapdata->hashTableSize);
-        e->nextInCommittedView = NULL;
-        e->nextSameHash = mapdata->data[hash];
+        e->nextInCommittedView = e->nextSameHash = mapdata->data[hash];
         mapdata->data[hash] = e;
         if (fread(e->data, ROUND_UP_FILESIZE(actualSize), 1, fp) != 1) {
             free(buffer);
@@ -1100,8 +1223,17 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
         }
         ++mapdata->count;
     }
+    free(buffer);
+    fclose(fp);
+
     // mapdata->count = hdr.numberOfRecords;
     mapdata->lastCommittedRef = hdr.lastCommittedRef;
-    fclose(fp);
-    free(buffer);
+    struct map *viewdata = mapdata->committedView;
+    if (viewdata) {
+        // transfer everything from main view to committed view as well
+        // assumes same hashtablesize
+        memcpy(viewdata->data, mapdata->data, sizeof(struct entry *) * mapdata->hashTableSize);
+        viewdata->count = mapdata->count;
+        viewdata->lastCommittedRef = mapdata->lastCommittedRef;
+    }
 }

@@ -2,7 +2,6 @@ package de.jpaw.offHeap;
 
 import java.io.PrintStream;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -43,7 +42,10 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     /** Allocates and initializes a new data structure for the given maximum number of elements.
      * Returns the resulting off heap location.
      */
-    private native long natOpen(int size, int modes);
+    private native long natOpen(int size, int modes, boolean withCommittedView);
+    
+    /** Returns the read-only shadow (committed view) of the map, or null if this map does not have a shadow. */
+    private native long natGetView(long cMap);
     
     /** Closes the map (clears the map and all entries it from memory).
      * After close() has been called, the object should not be used any more. */
@@ -53,7 +55,7 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     private native void natClear(long cMap, long ctx);
 
     /** Dump the full database contents to a disk file. */
-    private native void natWriteToFile(long cMap, byte [] pathname);
+    private native void natWriteToFile(long cMap, byte [] pathname, boolean fromCommittedView);
     
     /** Read a database from disk. The database should be empty before. */
     private native void natReadFromFile(long cMap, byte [] pathname);
@@ -95,7 +97,7 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     /** Return a portion of a stored element, determined by offset and length.
      * The purpose of this method is to allow the transfer of a small portion of the data.
      * returns -1 if the entry did not exist, or the number of bytes transferred. */
-    public native byte [] natGetRegion(long cMap, long key, int offset, int length);
+    private native byte [] natGetRegion(long cMap, long key, int offset, int length);
 
     /** Return a portion of a stored element, determined by field delimiters, excluding the delimiters.
      * Field numbering starts with 0. The first delimiter acts as a field separator, such as comma in CSV,
@@ -117,10 +119,10 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     protected abstract byte [] valueTypeToByteArray(V arg);
     protected abstract V byteArrayToValueType(byte [] arg);
     
-    
+    // TODO: use the builder pattern here, the number of optional parameters is growing...
     public AbstractPrimitiveLongKeyOffHeapMap(int size, Shard forShard, int modes) {
         myShard = forShard;
-        cStruct = natOpen(size, modes);
+        cStruct = natOpen(size, modes, true);
     }
     public AbstractPrimitiveLongKeyOffHeapMap(int size, Shard forShard) {
         this(size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, -1);
@@ -132,7 +134,7 @@ public abstract class AbstractPrimitiveLongKeyOffHeapMap<V> implements Primitive
     /** Dump the full database contents to a disk file. */
     @Override
     public void writeToFile(String pathname, Charset filenameEncoding) {
-        natWriteToFile(cStruct, pathname.getBytes(filenameEncoding == null ? DEFAULT_FILENAME_ENCODING : filenameEncoding));
+        natWriteToFile(cStruct, pathname.getBytes(filenameEncoding == null ? DEFAULT_FILENAME_ENCODING : filenameEncoding), false);
     }
     
     /** Read a database from disk. The database should be empty before. */
