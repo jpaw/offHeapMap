@@ -4,8 +4,8 @@ import java.nio.charset.Charset;
 
 import de.jpaw.collections.DatabaseIO;
 import de.jpaw.collections.PrimitiveLongKeyMap;
-
 import de.jpaw.collections.ByteArrayConverter;
+import de.jpaw.collections.PrimitiveLongKeyMapView;
 
 public class PrimitiveLongKeyOffHeapMap<V> extends PrimitiveLongKeyOffHeapMapView<V>
 implements PrimitiveLongKeyMap<V>, DatabaseIO {
@@ -177,6 +177,11 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         for (PrimitiveLongKeyMap.Entry<? extends V> otherEntry : otherMap) {
             set(otherEntry.getKey(), otherEntry.getValue());
         }
+    }
+    
+    @Override
+    public PrimitiveLongKeyMapView<V> getView() {
+        return myView;
     }
 
 }

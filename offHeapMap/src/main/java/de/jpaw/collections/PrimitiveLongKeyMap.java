@@ -18,4 +18,6 @@ public interface PrimitiveLongKeyMap<V> extends PrimitiveLongKeyMapView<V> {
     public void putAll(PrimitiveLongKeyMap<? extends V> m);
 
     public void clear();
+    
+    public PrimitiveLongKeyMapView<V> getView();
 }
