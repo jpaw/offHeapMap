@@ -353,6 +353,8 @@ JNIEXPORT int JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natUpdateViews
     struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     struct tx_delayed_update *upd = (struct tx_delayed_update *)transactions;
     if (upd->lastCommittedRef != hdr->lastCommittedRefOnViews) {
+        fprintf(stderr, "current = %ld, lastCommitted = %ld, last committed on views = %ld\n",
+                (long)hdr->currentTransactionRef, (long)hdr->lastCommittedRef, (long)hdr->lastCommittedRefOnViews);
         throwAny(env, "Invalid sequence of replays");
         return 0;
     }
@@ -381,8 +383,17 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
     fprintf(stderr, "COMMIT START\n");
 #endif
     struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
+
+
     int currentEntries = hdr->number_of_changes;
     if (currentEntries) {
+        if (hdr->lastCommittedRef != hdr->lastCommittedRefOnViews) {
+            fprintf(stderr, "current = %ld, lastCommitted = %ld, last committed on views = %ld\n",
+                    (long)hdr->currentTransactionRef, (long)hdr->lastCommittedRef, (long)hdr->lastCommittedRefOnViews);
+            throwAny(env, "Invalid sequence of commit");
+            return 0;
+        }
+
         struct tx_log_list *chunk = NULL;
         int i;
         for (i = 0; i < currentEntries; ++i) {
@@ -395,6 +406,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
     }
     hdr->number_of_changes = 0;
     hdr->lastCommittedRef = hdr->currentTransactionRef;
+    hdr->lastCommittedRefOnViews = hdr->currentTransactionRef;
     hdr->currentTransactionRef += hdr->changeNumberDelta;
 #ifdef DEBUG
     fprintf(stderr, "COMMIT END\n");
