@@ -16,8 +16,8 @@ public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte [
         }
     };
     
-    protected LongToByteArrayOffHeapMap(ByteArrayConverter<byte[]> converter, int size, Shard forShard, int modes) {
-        super(converter, size, forShard, modes);
+    protected LongToByteArrayOffHeapMap(ByteArrayConverter<byte[]> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
+        super(converter, size, forShard, modes, withCommittedView);
     }
 
     public static class Builder extends PrimitiveLongKeyOffHeapMap.Builder<byte [], LongToByteArrayOffHeapMap> {
@@ -26,7 +26,7 @@ public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte [
             super(myConverter);
         }
         public LongToByteArrayOffHeapMap build() {
-            return new LongToByteArrayOffHeapMap(converter, hashSize, shard, mode);
+            return new LongToByteArrayOffHeapMap(converter, hashSize, shard, mode, withCommittedView);
         }
     }
     

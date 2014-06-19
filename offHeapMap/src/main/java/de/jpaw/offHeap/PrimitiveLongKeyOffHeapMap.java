@@ -61,10 +61,10 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
 
     
     // TODO: use the builder pattern here, the number of optional parameters is growing...
-    protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes) {
-        super(converter, natOpen(size, modes, true), false);
+    protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
+        super(converter, natOpen(size, modes, withCommittedView), false);
         myShard = forShard;
-        myView = new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true);
+        myView = withCommittedView ? new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true) : null;
     }
     
     public abstract static class Builder<V, T extends PrimitiveLongKeyOffHeapMap<V>> {
@@ -72,6 +72,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         protected int hashSize = 4096;
         protected int mode = -1;
         protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
+        protected boolean withCommittedView = false;
         
         public Builder(ByteArrayConverter<V> converter) {
             this.converter = converter;
@@ -86,6 +87,10 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         }
         public Builder<V, T> setAutonomous() {
             this.mode = 0;
+            return this;
+        }
+        public Builder<V, T> addCommittedView() {
+            this.withCommittedView = true;
             return this;
         }
         public abstract T build();

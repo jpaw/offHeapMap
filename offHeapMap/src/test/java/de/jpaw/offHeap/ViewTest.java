@@ -13,7 +13,11 @@ public class ViewTest {
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
     
-        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
+        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap.Builder()
+            .setHashSize(1000)
+            .setShard(s1)
+            .addCommittedView()
+            .build();
         PrimitiveLongKeyMapView<String> myView = myMap.getView();
         
         myMap.set(1L, "The");
