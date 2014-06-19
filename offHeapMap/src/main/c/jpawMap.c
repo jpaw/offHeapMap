@@ -54,6 +54,16 @@ struct tx_log_entry {
     struct entry *new_entry;
 };
 
+
+struct tx_delayed_update {
+    jlong lastCommittedRef;         // this must be the predecessor
+    jlong currentTransactionRef;
+    int numberOfChanges;            // how many rows have been affected?
+    int padding;
+    struct tx_log_entry transactions [];
+};
+
+
 #define TX_LOG_ENTRIES_PER_CHUNK_LV1    1024        // first level blocks
 #define TX_LOG_ENTRIES_PER_CHUNK_LV2     256        // changes in final block
 
@@ -74,9 +84,12 @@ struct tx_log_list {
 
 // global variables
 struct tx_log_hdr {
-    int number_of_changes;
-    int modes;
+    int number_of_changes;          // (uncommitted) row changes pending in the current transaction
+    int modes;                      // if tx mode is enabled
+    jlong changeNumberDelta;
+    jlong currentTransactionRef;
     jlong lastCommittedRef;
+    jlong lastCommittedRefOnViews;
     struct tx_log_list *chunks[TX_LOG_ENTRIES_PER_CHUNK_LV1];
 };
 
@@ -177,10 +190,10 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_0002
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCreateTransaction
- * Signature: (I)J
+ * Signature: (IJ)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransaction
-  (JNIEnv *env, jobject tx, jint mode) {
+  (JNIEnv *env, jobject tx, jint mode, jlong changeNumberDelta) {
     struct tx_log_hdr *hdr = malloc(sizeof(struct tx_log_hdr));
     if (!hdr) {
         throwOutOfMemory(env);
@@ -190,6 +203,9 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
     hdr->modes = mode;
     hdr->number_of_changes = 0;
     hdr->lastCommittedRef = (jlong)-1L;
+    hdr->lastCommittedRefOnViews = (jlong)-1L;
+    hdr->changeNumberDelta = changeNumberDelta;
+    hdr->currentTransactionRef = changeNumberDelta;
 #ifdef DEBUG
     fprintf(stderr, "CREATE TRANSACTION\n");
 #endif
@@ -238,6 +254,22 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natBeginTransaction
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natBeginTransaction
+(JNIEnv *env, jobject me, jlong cTx, jlong newRef) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
+    if (hdr->number_of_changes) {
+        throwAny(env, "Cannot begin transaction while changes are pending");
+        return;
+    }
+    hdr->currentTransactionRef = newRef;
+}
+
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natSetSafepoint
  * Signature: (J)I
  */
@@ -247,13 +279,103 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
     return hdr->number_of_changes;
 }
 
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natCommitDelayedUpdate
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommitDelayedUpdate
+    (JNIEnv *env, jobject me, jlong cTx) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
+    int number_of_changes = hdr->number_of_changes;
+    if (!number_of_changes) {
+        return (jlong)0;
+    }
+    struct tx_delayed_update *upd = malloc(sizeof(struct tx_delayed_update) + sizeof(struct tx_log_entry) * number_of_changes);
+    if (!upd) {
+        throwOutOfMemory(env);
+        return (jlong)0;
+    }
+    upd->lastCommittedRef = hdr->lastCommittedRef;
+    upd->currentTransactionRef = hdr->currentTransactionRef;
+    upd->numberOfChanges = number_of_changes;
+    upd->padding = 0;
+
+    int i = 0;
+    int j = 0;  // slot number
+    while (i + TX_LOG_ENTRIES_PER_CHUNK_LV2 < number_of_changes) {  // a loop for all but the last one
+        memcpy(&(upd->transactions[i]), hdr->chunks[j], sizeof(struct tx_log_entry) * TX_LOG_ENTRIES_PER_CHUNK_LV2);
+        ++j;
+        i += TX_LOG_ENTRIES_PER_CHUNK_LV2;
+    }
+    memcpy(&(upd->transactions[i]), hdr->chunks[j], sizeof(struct tx_log_entry) * (number_of_changes - i));
+    hdr->number_of_changes = 0;
+    hdr->lastCommittedRef = hdr->currentTransactionRef;
+    hdr->currentTransactionRef += hdr->changeNumberDelta;
+    return (jlong)upd;
+}
+
+void replayUpdateOnView(struct tx_log_hdr *hdr, struct tx_log_entry *ep) {
+    ep->affected_table->lastCommittedRef = hdr->currentTransactionRef;
+    struct map *view = ep->affected_table->committedView;
+    if (!view) {
+        // no shadow: simple rule: discard old entry.
+        struct entry *e = ep->old_entry;
+        if (e)
+            free(e);
+    } else {
+        // have secondary view. Do not discard old entry, because we either still need it, or we discard it within a recursive call
+        // we have a view, and are asked to replay the tx on it
+        if (!ep->new_entry) {
+            // was a remove => remove it on the view (which frees the old data)
+            execRemoveShadow(view, ep->old_entry->key);
+        } else {
+            // insert or replace
+            struct entry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
+            if (shouldBeOld != ep->old_entry)
+                fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
+            // if new_entry was not null, then free it (it is no longer required)
+            if (ep->old_entry)
+                free(ep->old_entry);
+        }
+        view->lastCommittedRef = hdr->currentTransactionRef;
+    }
+}
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natUpdateViews
+ * Signature: (JJ)V
+ */
+JNIEXPORT int JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natUpdateViews
+(JNIEnv *env, jobject me, jlong cTx, jlong transactions) {
+    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
+    struct tx_delayed_update *upd = (struct tx_delayed_update *)transactions;
+    if (upd->lastCommittedRef != hdr->lastCommittedRefOnViews) {
+        throwAny(env, "Invalid sequence of replays");
+        return 0;
+    }
+    int numberOfChanges = upd->numberOfChanges;
+    int i;
+    struct tx_log_entry *ep = upd->transactions;
+    for (i = 0; i < numberOfChanges; ++i) {
+        replayUpdateOnView(hdr, ep++);
+    }
+
+    hdr->lastCommittedRefOnViews = upd->currentTransactionRef;
+    free(upd);
+    return numberOfChanges;
+}
+
+
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: (JJ)I
+ * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *env, jobject me, jlong cTx, jlong ref) {
+  (JNIEnv *env, jobject me, jlong cTx) {
     // currently no redo logs are written. Therefore just discard the entries
 #ifdef DEBUG
     fprintf(stderr, "COMMIT START\n");
@@ -268,35 +390,12 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
                 // need a new chunk
                 chunk = hdr->chunks[i >> 8];
             }
-            struct tx_log_entry *ep = &(chunk->entries[i & 0xff]);
-            ep->affected_table->lastCommittedRef = ref;
-            struct map *view = ep->affected_table->committedView;
-            if (!view) {
-                // no shadow: simple rule: discard old entry.
-                struct entry *e = ep->old_entry;
-                if (e)
-                    free(e);
-            } else {
-                // have secondary view. Do not discard old entry, because we either still need it, or we discard it within a recursive call
-                // we have a view, and are asked to replay the tx on it
-                if (!ep->new_entry) {
-                    // was a remove => remove it on the view (which frees the old data)
-                    execRemoveShadow(view, ep->old_entry->key);
-                } else {
-                    // insert or replace
-                    struct entry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
-                    if (shouldBeOld != ep->old_entry)
-                        fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
-                    // if new_entry was not null, then free it (it is no longer required)
-                    if (ep->old_entry)
-                        free(ep->old_entry);
-                }
-                view->lastCommittedRef = ref;
-            }
+            replayUpdateOnView(hdr, &(chunk->entries[i & 0xff]));
         }
     }
     hdr->number_of_changes = 0;
-    hdr->lastCommittedRef = ref;
+    hdr->lastCommittedRef = hdr->currentTransactionRef;
+    hdr->currentTransactionRef += hdr->changeNumberDelta;
 #ifdef DEBUG
     fprintf(stderr, "COMMIT END\n");
 #endif

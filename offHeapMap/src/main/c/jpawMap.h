@@ -225,10 +225,10 @@ extern "C" {
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCreateTransaction
- * Signature: (I)J
+ * Signature: (IJ)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransaction
-  (JNIEnv *, jobject, jint);
+  (JNIEnv *, jobject, jint, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
@@ -240,10 +240,34 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natBeginTransaction
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natBeginTransaction
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: (JJ)I
+ * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natCommitDelayedUpdate
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommitDelayedUpdate
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     de_jpaw_offHeap_OffHeapTransaction
+ * Method:    natUpdateViews
+ * Signature: (JJ)I
+ */
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natUpdateViews
   (JNIEnv *, jobject, jlong, jlong);
 
 /*

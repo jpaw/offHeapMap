@@ -122,7 +122,6 @@ public class OffHeapMapBench {
     private static final long KEY = 552528219827L;
     private static final long KEY_PERM_SMALL = 552528219828L;
     private static final long KEY_PERM_1KB = 552528219829L;
-    private static final long CHANGE_ID = 553428219827L;
     private static final byte [] SHORTDATA = { (byte)1, (byte)2, (byte)3 };
     
     private LongToByteArrayOffHeapMap mapNoTransactions = null;
@@ -168,7 +167,7 @@ public class OffHeapMapBench {
 
     @GenerateMicroBenchmark
     public void commitOpNoRows() {
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
 
     
@@ -232,13 +231,13 @@ public class OffHeapMapBench {
     @GenerateMicroBenchmark
     public void insertCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
     
     @GenerateMicroBenchmark
     public void insertCommitGetOp(BlackHole bh) {
         mapWithTransactions.set(KEY, SHORTDATA);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
         bh.consume(mapWithTransactions.get(KEY));
     }
 
@@ -246,7 +245,7 @@ public class OffHeapMapBench {
     public void insertDeleteCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
         mapWithTransactions.delete(KEY);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
     
     @GenerateMicroBenchmark
@@ -257,7 +256,7 @@ public class OffHeapMapBench {
     @GenerateMicroBenchmark
     public void deleteOpWithTx() {
         mapWithTransactions.delete(KEY);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
 
 }

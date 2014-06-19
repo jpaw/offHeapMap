@@ -56,4 +56,8 @@ Before any 1.0.0 release, all APIs are considered to be in flux. (No promise the
 Support for the following features is planned for subsequent releases:
  - writing redo logs synchronously or asynchronously for replication to shadow databases (using chronicle: https://github.com/peter-lawrey/Java-Chronicle)
  - master / master replication / conflict detection
- - secondary unique and non-unique indexes (hash or Btree) for simple queries
+ - secondary unique and non-unique indexes (hash or Btree) for simple queries. Iterator for non-unique keys
+ - compacting redo logs (discarding subsequent changes on the same key within a single transaction)
+ - add commit ref to table structure (required to identify conflicts in master/master replication mode, also allows optimistic locking)
+ - operations deleteIf(key, oldref) / setIf(key, value, oldref)
+ - optimize redo / rollback: compare entry ptrs instead of keys
