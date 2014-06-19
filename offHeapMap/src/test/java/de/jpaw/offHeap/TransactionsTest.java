@@ -23,7 +23,7 @@ public class TransactionsTest {
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
         
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000, s1, OffHeapTransaction.TRANSACTIONAL);
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
         myMap.set(KEY, b1);
         tx1.setSafepoint();
         myMap.set(KEY, b2);
@@ -42,7 +42,7 @@ public class TransactionsTest {
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
         
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000, s1, OffHeapTransaction.TRANSACTIONAL);
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
         myMap.set(KEY, b1);
         tx1.commit();
         myMap.set(KEY, b2);
@@ -59,7 +59,7 @@ public class TransactionsTest {
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
         
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000, s1, OffHeapTransaction.TRANSACTIONAL);
+        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
         myMap.set(KEY, b1);
         tx1.commit();
         myMap.set(KEY, b2);
@@ -82,6 +82,5 @@ public class TransactionsTest {
         myMap.close();
         tx1.close();
     }
-
 
 }

@@ -16,12 +16,12 @@ public class OffHeapMapTest {
     static public Charset defCS = StandardCharsets.UTF_8;
     
     public void runOpenCloseTest() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         myMap.close();
     }
 
     public void runStoreRetrieveTestUncompressed() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         byte [] oldData = TEXT.getBytes();
         myMap.set(KEY, oldData);
         
@@ -39,7 +39,7 @@ public class OffHeapMapTest {
     }
 
     public void runStoreRetrieveTestCompressed() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         myMap.setMaxUncompressedSize(0);
         byte [] oldData = TEXT.getBytes();
         myMap.set(KEY, oldData);
@@ -68,7 +68,7 @@ public class OffHeapMapTest {
 
 
     public void runStoreRetrieveTestCompressedLongtext() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(1000);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         myMap.setMaxUncompressedSize(0);
         byte [] oldData = (TEXT+TEXT+TEXT+TEXT).getBytes();
         myMap.set(KEY, oldData);
@@ -91,7 +91,7 @@ public class OffHeapMapTest {
     
     public void runStoreRetrieveTestCompressedWithVerify() {
         final int HASH_SIZE = 10000;
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(HASH_SIZE);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(HASH_SIZE);
         myMap.setMaxUncompressedSize(0);
         
         final int MAX_ENTRIES = 3 * HASH_SIZE; 
@@ -119,7 +119,7 @@ public class OffHeapMapTest {
     
     public void storeIntoBufferTransfer() {
         int len;
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(20);
         myMap.set(KEY,  "4444".getBytes(defCS));
         byte [] buffer = "xxxxxxxxxx".getBytes(defCS);
         
@@ -138,7 +138,7 @@ public class OffHeapMapTest {
     }
 
     public void getField() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(20);
         myMap.set(KEY,  ";hello;world;;field4;@@field7;end".getBytes(defCS));
         String [] expected = { "", "hello", "world", "", "field4", null, null, "field7", "end", null, null };
         
@@ -156,7 +156,7 @@ public class OffHeapMapTest {
     }
     
     public void getRegionTest() {
-        LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap(20);
+        LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(20);
         byte [] data = "John likes to play foo bar with his dog".getBytes(defCS);
         myMap.set(KEY, data);
 
