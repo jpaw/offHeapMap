@@ -106,11 +106,11 @@ struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry);
 
 // Iterator
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natInit
  * Signature: (Ljava/lang/Class;)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natInit
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natInit
   (JNIEnv *env, jclass myClass, jclass iteratorClass) {
 
     // Get the Field ID of the instance variables "number"
@@ -130,11 +130,11 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMapEntryIterator
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntryIterator
  * Method:    natIterate
- * Signature: (JJ)J
+ * Signature: (JJI)J
  */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
   (JNIEnv *env, jobject myClass, jlong cMap, jlong nextEntryPtr, jint hashIndex) {
     struct map *mapdata = (struct map *)cMap;
     struct entry *e = (struct entry *)nextEntryPtr;
@@ -410,11 +410,11 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
 
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natOpen
- * Signature: (I)V
+ * Signature: (IIZ)J
  */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natOpen
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natOpen
     (JNIEnv *env, jobject me, jint size, jint mode, jboolean withCommittedView) {
     // round up the size to multiples of 32, for the collision indicator
     size = ((size - 1) | 31) + 1;
@@ -462,11 +462,11 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natGetView
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetView
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natGetView
   (JNIEnv *env, jobject me, jlong cMap) {
     struct map *mapdata = (struct map *) cMap;
     return (jlong)mapdata->committedView;
@@ -491,11 +491,12 @@ void clear(struct entry **data, int numEntries) {
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natClose
- * Signature: ()V
+ * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natClose(JNIEnv *env, jobject me, jlong cMap) {
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClose
+    (JNIEnv *env, jobject me, jlong cMap) {
     // Get the int given the Field ID
     struct map *mapdata = (struct map *) cMap;
     clear(mapdata->data, mapdata->hashTableSize);
@@ -505,22 +506,23 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natGetSize
- * Signature: ()I
+ * Signature: (J)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetSize
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetSize
     (JNIEnv *env, jobject me, jlong cMap) {
     return ((struct map *)cMap)->count;
 }
 
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natClear
- * Signature: ()V
+ * Signature: (JJ)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natClear(JNIEnv *env, jobject me, jlong cMap, jlong ctxAsLong) {
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClear
+    (JNIEnv *env, jobject me, jlong cMap, jlong ctxAsLong) {
     // Get the int given the Field ID
     struct map *mapdata = (struct map *) cMap;
     struct tx_log_hdr *ctx = (struct tx_log_hdr *)ctxAsLong;
@@ -589,34 +591,38 @@ struct entry *find_entry(struct map *mapdata, long key) {
     }
     return e;  // null
 }
+
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natGet
- * Signature: (J)[B
+ * Signature: (JJ)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGet(JNIEnv *env, jobject me, jlong cMap, jlong key) {
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGet
+    (JNIEnv *env, jobject me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     return toJavaByteArray(env, e);
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natLength
- * Signature: (J)I
+ * Signature: (JJ)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natLength(JNIEnv *env, jobject me, jlong cMap, jlong key) {
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natLength
+    (JNIEnv *env, jobject me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     return (jint)(e ? e->uncompressedSize : -1);
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natCompressedLength
- * Signature: (J)I
+ * Signature: (JJ)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natCompressedLength(JNIEnv *env, jobject me, jlong cMap, jlong key) {
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natCompressedLength
+    (JNIEnv *env, jobject me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
     return (jint)(e ? e->compressedSize : -1);
@@ -687,21 +693,23 @@ jboolean execRemoveShadow(struct map *mapdata, jlong key) {
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natDelete
- * Signature: (J)Z
+ * Signature: (JJJ)Z
  */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natDelete(JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natDelete
+    (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
     return execRemove((struct tx_log_hdr *)ctx, (struct map *) cMap, key);
 }
 
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natRemove
- * Signature: (J)[B
+ * Signature: (JJJ)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natRemove(JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natRemove
+    (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
     struct map *mapdata = (struct map *) cMap;
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *prev = NULL;
@@ -844,12 +852,12 @@ struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry) {
 
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natSet
- * Signature: (J[BZ)Z
+ * Signature: (JJJ[BIIZ)Z
  */
-JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natSet(
-        JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
+JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natSet
+    (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
@@ -863,12 +871,12 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapM
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natPut
- * Signature: (J[BZ)[B
+ * Signature: (JJJ[BIIZ)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natPut(
-        JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natPut
+    (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
@@ -893,12 +901,12 @@ int computeChainLength(struct entry *e) {
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natGetHistogram
- * Signature: ([I)I
+ * Signature: (J[I)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetHistogram
-  (JNIEnv *env, jobject me, jlong cMap, jintArray histogram) {
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetHistogram
+    (JNIEnv *env, jobject me, jlong cMap, jintArray histogram) {
     struct map *mapdata = (struct map *) cMap;
     int maxLen = 0;
     int numHistogramEntries = (*env)->GetArrayLength(env, histogram);
@@ -922,11 +930,11 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
- * Method:    natGetRegion
- * Signature: (J[BII)I
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
+ * Method:    natGetIntoPreallocated
+ * Signature: (JJ[BI)I
  */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetIntoPreallocated
+JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetIntoPreallocated
   (JNIEnv *env, jobject me, jlong cMap, jlong key, jbyteArray target, jint offset) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
@@ -946,11 +954,11 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natGetRegion
- * Signature: (JII)[B
+ * Signature: (JJII)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetRegion
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetRegion
   (JNIEnv *env, jobject me, jlong cMap, jlong key, jint offset, jint length) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
@@ -968,11 +976,11 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHea
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Method:    natGetField
- * Signature: (JIBB)[B
+ * Signature: (JJIBB)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natGetField
+JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetField
   (JNIEnv *env, jobject me, jlong cMap, jlong key, jint fieldNo, jbyte delimiter, jbyte nullIndicator) {
     struct map *mapdata = (struct map *) cMap;
     struct entry *e = find_entry(mapdata, key);
@@ -1094,12 +1102,14 @@ char *allocateBuffers(JNIEnv *env, char **buffer, jbyteArray filename) {
 
 #define MAGIC_DB_CONSTANT   0x283462FE
 #define ENTRY_HDR_SIZE      (2 * sizeof(int) + sizeof(jlong))
+
+
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natWriteToFile
- * Signature: (JLjava/lang/String;)V
+ * Signature: (J[BZ)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natWriteToFile
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natWriteToFile
   (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename, jboolean fromCommittedView) {
     struct filedumpHeader hdr;
     struct map *mapdata = (struct map *) cMap;
@@ -1147,11 +1157,11 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_n
 }
 
 /*
- * Class:     de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
  * Method:    natReadFromFile
- * Signature: (JLjava/lang/String;)V
+ * Signature: (J[B)V
  */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractPrimitiveLongKeyOffHeapMap_natReadFromFile
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natReadFromFile
   (JNIEnv *env, jobject me, jlong cMap, jbyteArray filename) {
     struct filedumpHeader hdr;
     struct map *mapdata = (struct map *) cMap;

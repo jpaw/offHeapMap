@@ -7,12 +7,12 @@ import de.jpaw.collections.PrimitiveLongKeyMap;
 
 import de.jpaw.collections.ByteArrayConverter;
 
-public class AbstractPrimitiveLongKeyOffHeapMap<V> extends AbstractPrimitiveLongKeyOffHeapMapView<V>
+public class PrimitiveLongKeyOffHeapMap<V> extends PrimitiveLongKeyOffHeapMapView<V>
 implements PrimitiveLongKeyMap<V>, DatabaseIO {
     
     private final Shard myShard;
     
-    private final AbstractPrimitiveLongKeyOffHeapMapView<V> myView;
+    private final PrimitiveLongKeyOffHeapMapView<V> myView;
     
     /** The threshold at which entries stored should be automatically compressed, in bytes.
      * Setting it to Integer.MAX_VALUE will disable compression. Setting it to 0 will perform compression for all (non-zero-length) items. */
@@ -61,13 +61,13 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
 
     
     // TODO: use the builder pattern here, the number of optional parameters is growing...
-    protected AbstractPrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes) {
+    protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes) {
         super(converter, natOpen(size, modes, true), false);
         myShard = forShard;
-        myView = new AbstractPrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true);
+        myView = new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true);
     }
     
-    public abstract static class Builder<V, T extends AbstractPrimitiveLongKeyOffHeapMap<V>> {
+    public abstract static class Builder<V, T extends PrimitiveLongKeyOffHeapMap<V>> {
         protected final ByteArrayConverter<V> converter;
         protected int hashSize = 4096;
         protected int mode = -1;

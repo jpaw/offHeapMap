@@ -2,7 +2,7 @@ package de.jpaw.offHeap;
 
 import de.jpaw.collections.ByteArrayConverter;
 
-public class LongToByteArrayOffHeapMap extends AbstractPrimitiveLongKeyOffHeapMap<byte []> {
+public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte []> {
     
     private static final ByteArrayConverter<byte []> myConverter = new ByteArrayConverter<byte []>() {
         @Override
@@ -20,7 +20,7 @@ public class LongToByteArrayOffHeapMap extends AbstractPrimitiveLongKeyOffHeapMa
         super(converter, size, forShard, modes);
     }
 
-    public static class Builder extends AbstractPrimitiveLongKeyOffHeapMap.Builder<byte [], LongToByteArrayOffHeapMap> {
+    public static class Builder extends PrimitiveLongKeyOffHeapMap.Builder<byte [], LongToByteArrayOffHeapMap> {
 
         public Builder() {
             super(myConverter);

@@ -14,11 +14,11 @@ import de.jpaw.collections.PrimitiveLongKeyMapView;
  * This class should be inherited in order to create specific implementations fir fixed types of V, while the native implementation is fixed to byte arrays.
  * 
  *  This implementation is not thread-safe. */
-public class AbstractPrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapView<V> {
+public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapView<V> {
     
     static {
         OffHeapInit.init();
-        natInit(AbstractPrimitiveLongKeyOffHeapMapView.PrimitiveLongKeyOffHeapMapEntryIterator.class);
+        natInit(PrimitiveLongKeyOffHeapMapView.PrimitiveLongKeyOffHeapMapEntryIterator.class);
     }
     
     /** Only used by native code, to store the off heap address of the structure. */
@@ -27,7 +27,7 @@ public class AbstractPrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongK
     protected final boolean isView;
     
     // class can only be instantiated from a parent
-    protected AbstractPrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView) {
+    protected PrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView) {
         this.converter = converter;
         this.cStruct = cMap;
         this.isView = isView;

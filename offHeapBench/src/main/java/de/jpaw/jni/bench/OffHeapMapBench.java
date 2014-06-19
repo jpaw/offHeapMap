@@ -91,6 +91,29 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt        12        8.534        0.367    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt        12        8.309        0.410    ns/op
 
+// after introduction of Builder pattern and view Java subclass (& valueConverter in component instead of main class)
+//Benchmark                                               Mode   Samples         Mean   Mean error    Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                  avgt        12       11.317        0.291    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                    avgt        12       13.657        0.030    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                  avgt        12       25.449        0.351    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp              avgt        12      374.109        6.314    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                        avgt        12      178.464        5.584    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp            avgt        12      127.678        2.225    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                      avgt        12       88.902        1.524    ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                 avgt        12      130.551        4.046    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp               avgt        12      208.478       10.022    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                  avgt        12      111.114        3.710    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx       avgt        12     1169.077       18.414    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx     avgt        12      449.142       27.643    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt        12      164.773       47.153    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx              avgt        12      103.886        3.076    ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                 avgt        12      180.565        6.324    ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt        12       88.059        1.986    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt        12        8.721        0.017    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt        12        8.565        0.430    ns/op
+// remeasure insertDeleteCommitOp:
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt        12      141.021        7.319    ns/op
+
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(value = Scope.Thread)

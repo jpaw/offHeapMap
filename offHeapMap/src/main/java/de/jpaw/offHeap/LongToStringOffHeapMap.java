@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 import de.jpaw.collections.ByteArrayConverter;
 
 /** Off heap storage for Strings. */
-public class LongToStringOffHeapMap extends  AbstractPrimitiveLongKeyOffHeapMap<String> {
+public class LongToStringOffHeapMap extends  PrimitiveLongKeyOffHeapMap<String> {
     
     private static class StringConverter implements ByteArrayConverter<String> {
         private final Charset encoding;
@@ -30,7 +30,7 @@ public class LongToStringOffHeapMap extends  AbstractPrimitiveLongKeyOffHeapMap<
         super(converter, size, forShard, modes);
     }
 
-    public static class Builder extends AbstractPrimitiveLongKeyOffHeapMap.Builder<String, LongToStringOffHeapMap> {
+    public static class Builder extends PrimitiveLongKeyOffHeapMap.Builder<String, LongToStringOffHeapMap> {
 
         public Builder() {
             super(DEFAULT_CONVERTER);
