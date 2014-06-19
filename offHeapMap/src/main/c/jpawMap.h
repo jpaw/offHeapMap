@@ -241,10 +241,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: (JJZ)I
+ * Signature: (JJ)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *, jobject, jlong, jlong, jboolean);
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction

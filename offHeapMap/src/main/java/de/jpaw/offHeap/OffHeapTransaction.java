@@ -33,7 +33,7 @@ public class OffHeapTransaction {
     private native void natSetMode(long cTx, int modes);
     
     /** Commit a pending transaction. (Returns the number of low level DB row operations) */
-    private native int natCommit(long cTx, long ref, boolean synchronousUpdateCommittedView);
+    private native int natCommit(long cTx, long ref);
     
     /** Rollback a pending transaction (possibly only to a safepoint). */
     private native void natRollback(long cTx, int toWhere);
@@ -78,10 +78,10 @@ public class OffHeapTransaction {
     }
 
     public void commit() {
-        rowsChanged += natCommit(cStruct, transactionRef.incrementAndGet(), true);
+        rowsChanged += natCommit(cStruct, transactionRef.incrementAndGet());
     }
     public void commit(long ref) {
-        rowsChanged += natCommit(cStruct, ref, true);
+        rowsChanged += natCommit(cStruct, ref);
     }
     public void close() {
         natCloseTransaction(cStruct);

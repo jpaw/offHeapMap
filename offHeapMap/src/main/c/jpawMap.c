@@ -40,7 +40,7 @@ struct map {
     int modes;              // 00 = not transactional, -1 = take mode of transaction, 1 = TRANSACTIONAL
     int count;              // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
     int padding;
-    long lastCommittedRef;
+    jlong lastCommittedRef;
     struct map *committedView;  // same data, but synched after commit (to provide secondary view for read/only queries)
 };
 
@@ -76,6 +76,7 @@ struct tx_log_list {
 struct tx_log_hdr {
     int number_of_changes;
     int modes;
+    jlong lastCommittedRef;
     struct tx_log_list *chunks[TX_LOG_ENTRIES_PER_CHUNK_LV1];
 };
 
@@ -188,6 +189,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
     memset(hdr, 0, sizeof(struct tx_log_hdr));
     hdr->modes = mode;
     hdr->number_of_changes = 0;
+    hdr->lastCommittedRef = (jlong)-1L;
 #ifdef DEBUG
     fprintf(stderr, "CREATE TRANSACTION\n");
 #endif
@@ -198,7 +200,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransac
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCloseTransaction
- * Signature: ()V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
   (JNIEnv *env, jobject me, jlong cTx) {
@@ -222,7 +224,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransacti
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natSetMode
- * Signature: (I)V
+ * Signature: (JI)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
   (JNIEnv *env, jobject me, jlong cTx, jint mode) {
@@ -237,7 +239,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natSetSafepoint
- * Signature: ()I
+ * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
   (JNIEnv *env, jobject me, jlong cTx) {
@@ -248,10 +250,10 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natCommit
- * Signature: (J)I
+ * Signature: (JJ)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *env, jobject me, jlong cTx, jlong ref, jboolean synchronousUpdateCommittedView) {
+  (JNIEnv *env, jobject me, jlong cTx, jlong ref) {
     // currently no redo logs are written. Therefore just discard the entries
 #ifdef DEBUG
     fprintf(stderr, "COMMIT START\n");
@@ -267,6 +269,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
                 chunk = hdr->chunks[i >> 8];
             }
             struct tx_log_entry *ep = &(chunk->entries[i & 0xff]);
+            ep->affected_table->lastCommittedRef = ref;
             struct map *view = ep->affected_table->committedView;
             if (!view) {
                 // no shadow: simple rule: discard old entry.
@@ -275,27 +278,25 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
                     free(e);
             } else {
                 // have secondary view. Do not discard old entry, because we either still need it, or we discard it within a recursive call
-                if (synchronousUpdateCommittedView) {
-                    // we have a view, and are asked to replay the tx on it
-                    if (!ep->new_entry) {
-                        // was a remove => remove it on the view (which frees the old data)
-                        execRemoveShadow(view, ep->old_entry->key);
-                    } else {
-                        // insert or replace
-                        struct entry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
-                        if (shouldBeOld != ep->old_entry)
-                            fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
-                        // if new_entry was not null, then free it (it is no longer required)
-                        if (ep->old_entry)
-                            free(ep->old_entry);
-                    }
+                // we have a view, and are asked to replay the tx on it
+                if (!ep->new_entry) {
+                    // was a remove => remove it on the view (which frees the old data)
+                    execRemoveShadow(view, ep->old_entry->key);
                 } else {
-                    // TODO: implement scheduled (delayed) update in another thread
+                    // insert or replace
+                    struct entry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
+                    if (shouldBeOld != ep->old_entry)
+                        fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
+                    // if new_entry was not null, then free it (it is no longer required)
+                    if (ep->old_entry)
+                        free(ep->old_entry);
                 }
+                view->lastCommittedRef = ref;
             }
         }
     }
     hdr->number_of_changes = 0;
+    hdr->lastCommittedRef = ref;
 #ifdef DEBUG
     fprintf(stderr, "COMMIT END\n");
 #endif
@@ -332,7 +333,7 @@ void rollback(struct tx_log_entry *e) {
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natDebugRedoLog
- * Signature: ()V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natDebugRedoLog
   (JNIEnv *env, jobject me, jlong cTx) {
@@ -384,7 +385,7 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
 /*
  * Class:     de_jpaw_offHeap_OffHeapTransaction
  * Method:    natRollback
- * Signature: (I)V
+ * Signature: (JI)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
   (JNIEnv *env, jobject me, jlong cTx, jint rollbackTo) {
@@ -580,7 +581,7 @@ static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
 }
 
 
-struct entry *find_entry(struct map *mapdata, long key) {
+struct entry *find_entry(struct map *mapdata, jlong key) {
     int hash = computeHash(key, mapdata->hashTableSize);
     struct entry *e = mapdata->data[hash];
     while (e) {
@@ -1040,7 +1041,7 @@ struct filedumpHeader {
     int magicNumber;
     int numberOfRecords;
     long totalSize;
-    long lastCommittedRef;
+    jlong lastCommittedRef;
 };
 
 
