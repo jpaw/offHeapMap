@@ -8,12 +8,12 @@ public class StringMapTest {
     static public final long KEY = 437L;
     
     public void runOpenCloseTest() {
-        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap(1000);
+        LongToStringOffHeapMap myMap = LongToStringOffHeapMap.forHashSize(1000);
         myMap.close();
     }
 
     public void runStoreRetrieveTestUncompressed() {
-        LongToStringOffHeapMap myMap = new LongToStringOffHeapMap(1000);
+        LongToStringOffHeapMap myMap = LongToStringOffHeapMap.forHashSize(1000);
         
         myMap.set(KEY, TEXT);
         
@@ -29,8 +29,14 @@ public class StringMapTest {
 
         myMap.forEach(kvp -> System.out.println(String.format("Element is %d,%s", kvp.getKey(), kvp.getValue())));
         
+//        myMap.writeToFile("/tmp/testDB.ohm");
         myMap.close();
     }
 
-
+    public void restoreDbTest() {
+        LongToStringOffHeapMap myMap = LongToStringOffHeapMap.forHashSize(1000);
+//        myMap.readFromFile("/tmp/testDB.ohm");
+//        assert(myMap.size() == 4);
+        myMap.close();
+    }
 }

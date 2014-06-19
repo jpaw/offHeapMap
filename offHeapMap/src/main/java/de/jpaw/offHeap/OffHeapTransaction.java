@@ -1,7 +1,5 @@
 package de.jpaw.offHeap;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /** An OffHeapTransaction is assigned a collection of shards which participate.
  * A transaction is always "open", there is no need to start one.
  * Assignment of shards however can only be done while no uncommitted data exists.
@@ -11,8 +9,6 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  */
 public class OffHeapTransaction {
-    private static final AtomicLong transactionRef = new AtomicLong(0L);    // the previous system change number
-    
     // bitmasks for the transaction parameter - if all are 0, no transactions will be done
     public static int TRANSACTIONAL = 0x01;     // allow to rollback / safepoints
     public static int REDOLOG_ASYNC = 0x02;     // allow replaying on a different database - fast
@@ -27,13 +23,25 @@ public class OffHeapTransaction {
     }
     
     /** Set up the JNI data structures for a new transaction. */
-    private native long natCreateTransaction(int initialMode);
+    private native long natCreateTransaction(int initialMode, long changeNumberDelta);
     
     /** Set the logging modes of a transaction. Throws an exception if pending data is in the buffer. */
     private native void natSetMode(long cTx, int modes);
     
-    /** Commit a pending transaction. (Returns the number of low level DB row operations) */
-    private native int natCommit(long cTx, long ref);
+    /** Start a transaction / provide a new system change number. Calling this method is not required if the new change number should be the old plus
+     * a fixed delta. Throws an exception if updating operations have been performed already. */
+    private native void natBeginTransaction(long cTx, long ref);
+    
+    /** Commit a pending transaction and replay the changes to the committedView (if there is any).
+     * (Returns the number of low level DB row operations) */
+    private native int natCommit(long cTx);
+    
+    /** Commit a pending transaction and store the changes for later replay on the committedView (if there is any).
+     * Returns a pointer to the store. */
+    private native long natCommitDelayedUpdate(long cTx);
+    
+    /** Replay previously committed changes to the view. Returns the number of rows updated. */
+    private native int natUpdateViews(long cTx, long txPtr);
     
     /** Rollback a pending transaction (possibly only to a safepoint). */
     private native void natRollback(long cTx, int toWhere);
@@ -59,7 +67,11 @@ public class OffHeapTransaction {
     
     public OffHeapTransaction(int initialMode) {
         currentMode = initialMode;
-        cStruct = natCreateTransaction(initialMode);
+        cStruct = natCreateTransaction(initialMode, 1L);
+    }
+    
+    public void beginTransaction(long ref) {
+        natBeginTransaction(cStruct, ref);
     }
 
     public void rollback() {
@@ -76,12 +88,9 @@ public class OffHeapTransaction {
     public void rollbackToSafepoint() {
         natRollback(cStruct, lastSafepoint);
     }
-
+    
     public void commit() {
-        rowsChanged += natCommit(cStruct, transactionRef.incrementAndGet());
-    }
-    public void commit(long ref) {
-        rowsChanged += natCommit(cStruct, ref);
+        rowsChanged += natCommit(cStruct);
     }
     public void close() {
         natCloseTransaction(cStruct);
@@ -91,4 +100,17 @@ public class OffHeapTransaction {
     public void printRedoLog() {
         natDebugRedoLog(cStruct);        
     }
+    
+    /** Commit a pending transaction and store the changes for later replay on the committedView (if there is any).
+     * Returns a pointer to the store, or 0L if there is nothing to store. */
+    public long commitDelayedUpdate() {
+        return natCommitDelayedUpdate(cStruct);
+    }
+    
+    /** Replay previously committed changes to the view.
+     * Throws an Exception if the transactions are not replyed in order. */
+    public int updateViews(long transactions) {
+        return transactions != 0L ? natUpdateViews(cStruct, transactions) : 0;
+    }
+  
 }

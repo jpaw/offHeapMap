@@ -5,7 +5,7 @@ import java.util.Iterator;
 import org.testng.annotations.Test;
 
 import de.jpaw.collections.PrimitiveLongKeyMap;
-import de.jpaw.collections.PrimitiveLongKeyMap.Entry;
+import de.jpaw.collections.PrimitiveLongKeyMapView.Entry;
 
 
 @Test
@@ -19,7 +19,7 @@ public class IteratorTest {
     
     public void runIteratorTest() {
         int i;
-        PrimitiveLongKeyMap<byte[]> myMap = new LongToByteArrayOffHeapMap(8);
+        PrimitiveLongKeyMap<byte[]> myMap = LongToByteArrayOffHeapMap.forHashSize(8);
         assert(data[0] == b1);
         assert(data[1] == b2);
         assert(data[2] == b3);
@@ -53,7 +53,7 @@ public class IteratorTest {
     
     public void runIteratorWithDeleteTest() {
         int i;
-        PrimitiveLongKeyMap<byte[]> myMap = new LongToByteArrayOffHeapMap(8);
+        PrimitiveLongKeyMap<byte[]> myMap = LongToByteArrayOffHeapMap.forHashSize(8);
         
         for (i = 0; i < 4; ++i)
             myMap.set(keys[i], data[i]);

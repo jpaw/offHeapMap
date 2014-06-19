@@ -1,25 +1,38 @@
 package de.jpaw.offHeap;
 
-public class LongToByteArrayOffHeapMap extends AbstractPrimitiveLongKeyOffHeapMap<byte []> {
+import de.jpaw.collections.ByteArrayConverter;
 
-    public LongToByteArrayOffHeapMap(int size, Shard forShard, int modes) {
-        super(size, forShard, modes);
-    }
-    public LongToByteArrayOffHeapMap(int size, Shard forShard) {
-        super(size, forShard);
-    }
-    public LongToByteArrayOffHeapMap(int size) {
-        super(size);
+public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte []> {
+    
+    private static final ByteArrayConverter<byte []> myConverter = new ByteArrayConverter<byte []>() {
+        @Override
+        public byte[] valueTypeToByteArray(byte[] arg) {
+            return arg;
+        }
+
+        @Override
+        public byte[] byteArrayToValueType(byte[] arg) {
+            return arg;
+        }
+    };
+    
+    protected LongToByteArrayOffHeapMap(ByteArrayConverter<byte[]> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
+        super(converter, size, forShard, modes, withCommittedView);
     }
 
-    @Override
-    protected byte[] valueTypeToByteArray(byte[] arg) {
-        return arg;
-    }
+    public static class Builder extends PrimitiveLongKeyOffHeapMap.Builder<byte [], LongToByteArrayOffHeapMap> {
 
-    @Override
-    protected byte[] byteArrayToValueType(byte[] arg) {
-        return arg;
+        public Builder() {
+            super(myConverter);
+        }
+        public LongToByteArrayOffHeapMap build() {
+            return new LongToByteArrayOffHeapMap(converter, hashSize, shard, mode, withCommittedView);
+        }
+    }
+    
+    // convenience constructor
+    public static LongToByteArrayOffHeapMap forHashSize(int hashSize) {
+        return new Builder().setHashSize(hashSize).build();
     }
 
 }

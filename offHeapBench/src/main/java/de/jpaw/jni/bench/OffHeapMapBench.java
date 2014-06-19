@@ -70,6 +70,50 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt         6        8.756        0.075    ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt         6        8.400        1.050    ns/op
 
+// after introduction of committed view: commit & insert got slower, but acceptable overhead
+//Benchmark                                               Mode   Samples         Mean   Mean error    Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                  avgt        12       11.235        0.033    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                    avgt        12       13.656        0.030    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                  avgt        12       25.557        0.381    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp              avgt        12      381.435        9.438    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                        avgt        12      177.117        2.127    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp            avgt        12      125.873        6.484    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                      avgt        12       88.388        3.385    ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                 avgt        12      134.848        1.351    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp               avgt        12      193.674        5.197    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                  avgt        12      100.884        1.903    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx       avgt        12     1196.368       24.133    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx     avgt        12      468.316       37.412    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt        12      117.903        4.365    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx              avgt        12      105.900        4.659    ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                 avgt        12      180.652        3.838    ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt        12       88.064        0.936    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt        12        8.534        0.367    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt        12        8.309        0.410    ns/op
+
+// after introduction of Builder pattern and view Java subclass (& valueConverter in component instead of main class)
+//Benchmark                                               Mode   Samples         Mean   Mean error    Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                  avgt        12       11.317        0.291    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                    avgt        12       13.657        0.030    ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                  avgt        12       25.449        0.351    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp              avgt        12      374.109        6.314    ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                        avgt        12      178.464        5.584    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp            avgt        12      127.678        2.225    ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                      avgt        12       88.902        1.524    ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                 avgt        12      130.551        4.046    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp               avgt        12      208.478       10.022    ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                  avgt        12      111.114        3.710    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx       avgt        12     1169.077       18.414    ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx     avgt        12      449.142       27.643    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt        12      164.773       47.153    ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx              avgt        12      103.886        3.076    ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                 avgt        12      180.565        6.324    ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx               avgt        12       88.059        1.986    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                      avgt        12        8.721        0.017    ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                    avgt        12        8.565        0.430    ns/op
+// remeasure insertDeleteCommitOp:
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt        12      141.021        7.319    ns/op
+
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(value = Scope.Thread)
@@ -78,7 +122,6 @@ public class OffHeapMapBench {
     private static final long KEY = 552528219827L;
     private static final long KEY_PERM_SMALL = 552528219828L;
     private static final long KEY_PERM_1KB = 552528219829L;
-    private static final long CHANGE_ID = 553428219827L;
     private static final byte [] SHORTDATA = { (byte)1, (byte)2, (byte)3 };
     
     private LongToByteArrayOffHeapMap mapNoTransactions = null;
@@ -90,10 +133,10 @@ public class OffHeapMapBench {
     
     @Setup
     public void setUp() throws UnsupportedEncodingException {
-        mapNoTransactions = new LongToByteArrayOffHeapMap(1000);
-        mapNoTransactionsComp = new LongToByteArrayOffHeapMap(1000);
+        mapNoTransactions = LongToByteArrayOffHeapMap.forHashSize(1000);
+        mapNoTransactionsComp = LongToByteArrayOffHeapMap.forHashSize(1000);
         mapNoTransactionsComp.setMaxUncompressedSize(1);
-        mapWithTransactions = new LongToByteArrayOffHeapMap(1000, defaultShard);
+        mapWithTransactions = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(defaultShard).build();
         transaction = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
         defaultShard.setOwningTransaction(transaction);
         data1KB = (TEXT + TEXT + TEXT + TEXT).substring(0, 1024).getBytes("UTF-8");
@@ -124,7 +167,7 @@ public class OffHeapMapBench {
 
     @GenerateMicroBenchmark
     public void commitOpNoRows() {
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
 
     
@@ -188,13 +231,13 @@ public class OffHeapMapBench {
     @GenerateMicroBenchmark
     public void insertCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
     
     @GenerateMicroBenchmark
     public void insertCommitGetOp(BlackHole bh) {
         mapWithTransactions.set(KEY, SHORTDATA);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
         bh.consume(mapWithTransactions.get(KEY));
     }
 
@@ -202,7 +245,7 @@ public class OffHeapMapBench {
     public void insertDeleteCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
         mapWithTransactions.delete(KEY);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
     
     @GenerateMicroBenchmark
@@ -213,7 +256,7 @@ public class OffHeapMapBench {
     @GenerateMicroBenchmark
     public void deleteOpWithTx() {
         mapWithTransactions.delete(KEY);
-        transaction.commit(CHANGE_ID);
+        transaction.commit();
     }
 
 }
