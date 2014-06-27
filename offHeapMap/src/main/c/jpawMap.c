@@ -1,19 +1,10 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <jni.h>
-#include <lz4.h>
-#include "jpawMap.h"
+#include "jpawTransaction.h"
+#include "globalMethods.h"
 
 #define USE_CRITICAL_FOR_STORE
 // #define USE_CRITICAL_FOR_RETRIEVAL       // this seems to be much slower!
 
 #define SEPARATE_COMMITTED_VIEW
-
-#undef DEBUG
-//#define DEBUG
 
 
 
@@ -21,84 +12,48 @@
 #define ROUND_UP_SIZE(size)     ((((size) - 1) & ~0x0f) + 16)
 #define ROUND_UP_FILESIZE(size) ((((size) - 1) & ~0x07) + 8)  // as stored in the disk dump file
 
-struct entry {
+struct dataEntry {
     // start with the internal ptr, to allow writing a continuous area when dumping the file.
-    struct entry *nextSameHash;
+    struct dataEntry *nextSameHash;
 #ifdef SEPARATE_COMMITTED_VIEW
-    struct entry *nextInCommittedView;
+    struct dataEntry *nextInCommittedView;
 #endif
-    // from here, the entry is dumped to disk on saves.
+    // from here, the dataEntry is dumped to disk on saves.
     int uncompressedSize;       // size of the data, without this header portion
-    int compressedSize;         // 0 = is not compressed, otherwise size of the compressed output. The actual allocated space is rounded up such that the entry size is always a multiple of 16
+    int compressedSize;         // 0 = is not compressed, otherwise size of the compressed output. The actual allocated space is rounded up such that the dataEntry size is always a multiple of 16
     jlong key;
     char data[];
 };
 
+
 struct map {
-    struct entry **data;
+    int mapType;            // dataMap, indexMap, unique flag, organization, has view
+    int count;              // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
     int hashTableSize;
     int modes;              // 00 = not transactional, -1 = take mode of transaction, 1 = TRANSACTIONAL
-    int count;              // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
-    int padding;
+    struct dataEntry **data;
     jlong lastCommittedRef;
     struct map *committedView;  // same data, but synched after commit (to provide secondary view for read/only queries)
 };
 
-// stores a single modification of the maps.
-// the relevant types are insert / update / remove.
-// The type can be determined by which ptr is null and which not.
-// the "nextSameHash" entries are "misused"
-struct tx_log_entry {
-    struct map *affected_table;
-    struct entry *old_entry;
-    struct entry *new_entry;
-};
-
-
-struct tx_delayed_update {
-    jlong lastCommittedRef;         // this must be the predecessor
-    jlong currentTransactionRef;
-    int numberOfChanges;            // how many rows have been affected?
-    int padding;
-    struct tx_log_entry transactions [];
-};
-
-
-#define TX_LOG_ENTRIES_PER_CHUNK_LV1    1024        // first level blocks
-#define TX_LOG_ENTRIES_PER_CHUNK_LV2     256        // changes in final block
-
-
-// transaction modes. bitwise ORed, they go into the modes field of current_transaction
-
-#define TRANSACTIONAL 0x01     // allow to rollback / safepoints
-#define REDOLOG_ASYNC 0x02     // allow replaying on a different database - fast
-#define REDOLOG_SYNC 0x04      // allow replaying on a different database - safe
-#define AS_PER_TRANSACTION (-1)   // no override in map
-
-
-#define IS_TRANSACTIONAL(ctx, mapdata)  ((ctx) && (mapdata)->modes != 0 && (ctx)->modes != 0)
-
-struct tx_log_list {
-    struct tx_log_entry entries[TX_LOG_ENTRIES_PER_CHUNK_LV2];
-};
-
-// global variables
-struct tx_log_hdr {
-    int number_of_changes;          // (uncommitted) row changes pending in the current transaction
-    int modes;                      // if tx mode is enabled
-    jlong changeNumberDelta;
-    jlong currentTransactionRef;
-    jlong lastCommittedRef;
-    jlong lastCommittedRefOnViews;
-    struct tx_log_list *chunks[TX_LOG_ENTRIES_PER_CHUNK_LV1];
-};
 
 static jfieldID javaIteratorCurrentHashIndexFID;
 static jfieldID javaIteratorCurrentKeyFID;
 
 
-// reference: see http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
 
+// other protos...
+int computeHash(jlong arg, int size);
+void clear(struct dataEntry **data, int numEntries);
+int record_change(JNIEnv *env, struct tx_log_hdr *ctx, struct map *mapdata, struct dataEntry *oldData, struct dataEntry *newData);
+int transferWrite(const int fd, char *buffer, int oldOffset, void const *src, int len);
+char *allocateBuffers(JNIEnv *env, char **buffer, jbyteArray filename);
+struct dataEntry *find_entry(struct map *mapdata, jlong key);
+struct dataEntry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress);
+jboolean execRemove(JNIEnv *env, struct tx_log_hdr *ctx, struct map *mapdata, jlong key);
+jboolean execRemoveShadow(struct map *mapdata, jlong key);
+struct dataEntry * setPutSub(struct map *mapdata, struct dataEntry *newEntry);
+struct dataEntry * setPutSubShadow(struct map *mapdata, struct dataEntry *newEntry);
 
 
 
@@ -111,12 +66,64 @@ void throwAny(JNIEnv *env, char *msg) {
     (*env)->ThrowNew(env, exceptionCls, msg);
 }
 
-// forwards...
-jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key);
-jboolean execRemoveShadow(struct map *mapdata, jlong key);
-struct entry * setPutSub(struct map *mapdata, struct entry *newEntry);
-struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry);
 
+void replayUpdateOnView(jlong transactionReference, struct tx_log_entry *ep) {
+    ep->affected_table->lastCommittedRef = transactionReference;
+    struct map *view = ep->affected_table->committedView;
+    if (!view) {
+        // no shadow: simple rule: discard old entry.
+        struct dataEntry *e = ep->old_entry;
+        if (e)
+            free(e);
+    } else {
+        // have secondary view. Do not discard old entry, because we either still need it, or we discard it within a recursive call
+        // we have a view, and are asked to replay the tx on it
+        if (!ep->new_entry) {
+            // was a remove => remove it on the view (which frees the old data)
+            execRemoveShadow(view, ep->old_entry->key);
+        } else {
+            // insert or replace
+            struct dataEntry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
+            if (shouldBeOld != ep->old_entry)
+                fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
+            // if new_entry was not null, then free it (it is no longer required)
+            if (ep->old_entry)
+                free(ep->old_entry);
+        }
+        view->lastCommittedRef = transactionReference;
+    }
+}
+
+void debug_tx_log_entry(int i, struct tx_log_entry *loge) {
+    jlong key = loge->new_entry ? loge->new_entry->key : loge->old_entry->key;
+    fprintf(stderr, "redo log entry %5d is for key %16ld: old=%16p, new=%16p\n", i, key, loge->old_entry, loge->new_entry);
+}
+
+void rollback(struct tx_log_entry *e) {
+#ifdef DEBUG
+    fprintf(stderr, "Rolling back entry for %16p %16p %16p\n", e->affected_table, e->old_entry, e->new_entry);
+#endif
+    if (!e->old_entry) {
+        // was an insert
+#ifdef DEBUG
+        fprintf(stderr, "    => remove key %ld\n", e->new_entry->key);
+#endif
+        execRemove(NULL, NULL, e->affected_table, e->new_entry->key); // TODO: assert new entry was returned
+        // as old_entry was null, new_entry is definitely not null and must be deallocated
+        // free(e->new_entry);  // but this was done within execRenove already!
+    } else {
+        // replace or delete
+#ifdef DEBUG
+        fprintf(stderr, "    => insert / update %16p with key %ld\n", e->old_entry, e->old_entry->key);
+#endif
+        struct dataEntry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);
+        if (shouldBeNew != e->new_entry)
+            fprintf(stderr, "ROLLBACK PROBLEM: expected to get %16p, but got %16p for key %ld\n", e->new_entry, shouldBeNew, e->old_entry->key);
+        // if new_entry was not null, then free it (it is no longer required)
+        if (e->new_entry)
+            free(e->new_entry);
+    }
+}
 
 // Iterator
 /*
@@ -151,7 +158,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natIn
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
   (JNIEnv *env, jobject myClass, jlong cMap, jlong nextEntryPtr, jint hashIndex) {
     struct map *mapdata = (struct map *)cMap;
-    struct entry *e = (struct entry *)nextEntryPtr;
+    struct dataEntry *e = (struct dataEntry *)nextEntryPtr;
 #ifdef DEBUG
     fprintf(stderr, "iterate on map %16p (has %d entries in %d slots)\n", mapdata, mapdata->count, mapdata->hashTableSize);
 #endif
@@ -185,303 +192,21 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_0002
     return (jlong)0;
 }
 
-// transactions
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natCreateTransaction
- * Signature: (IJ)J
- */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCreateTransaction
-  (JNIEnv *env, jobject tx, jint mode, jlong changeNumberDelta) {
-    struct tx_log_hdr *hdr = malloc(sizeof(struct tx_log_hdr));
-    if (!hdr) {
-        throwOutOfMemory(env);
-        return (jlong)0;
-    }
-    memset(hdr, 0, sizeof(struct tx_log_hdr));
-    hdr->modes = mode;
-    hdr->number_of_changes = 0;
-    hdr->lastCommittedRef = (jlong)-1L;
-    hdr->lastCommittedRefOnViews = (jlong)-1L;
-    hdr->changeNumberDelta = changeNumberDelta;
-    hdr->currentTransactionRef = changeNumberDelta;
-#ifdef DEBUG
-    fprintf(stderr, "CREATE TRANSACTION\n");
-#endif
-    return (jlong)hdr;
-}
-
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natCloseTransaction
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCloseTransaction
-  (JNIEnv *env, jobject me, jlong cTx) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    if (hdr->number_of_changes) {
-        throwAny(env, "Cannot close within pending transaction");
-        return;
-    }
-    // free redo blocks
-    int i;
-    for (i = 0; i < TX_LOG_ENTRIES_PER_CHUNK_LV1 && hdr->chunks[i]; ++i) {
-        free(hdr->chunks[i]);
-    }
-    free(hdr);
-#ifdef DEBUG
-    fprintf(stderr, "CLOSE TRANSACTION\n");
-#endif
-}
-
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natSetMode
- * Signature: (JI)V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetMode
-  (JNIEnv *env, jobject me, jlong cTx, jint mode) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    if (hdr->number_of_changes) {
-        throwAny(env, "Cannot change mode within pending transaction");
-        return;
-    }
-    hdr->modes = mode;
-}
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natBeginTransaction
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natBeginTransaction
-(JNIEnv *env, jobject me, jlong cTx, jlong newRef) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    if (hdr->number_of_changes) {
-        throwAny(env, "Cannot begin transaction while changes are pending");
-        return;
-    }
-    hdr->currentTransactionRef = newRef;
-}
-
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natSetSafepoint
- * Signature: (J)I
- */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natSetSafepoint
-  (JNIEnv *env, jobject me, jlong cTx) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    return hdr->number_of_changes;
-}
-
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natCommitDelayedUpdate
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommitDelayedUpdate
-    (JNIEnv *env, jobject me, jlong cTx) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    int number_of_changes = hdr->number_of_changes;
-    if (!number_of_changes) {
-        return (jlong)0;
-    }
-    struct tx_delayed_update *upd = malloc(sizeof(struct tx_delayed_update) + sizeof(struct tx_log_entry) * number_of_changes);
-    if (!upd) {
-        throwOutOfMemory(env);
-        return (jlong)0;
-    }
-    upd->lastCommittedRef = hdr->lastCommittedRef;
-    upd->currentTransactionRef = hdr->currentTransactionRef;
-    upd->numberOfChanges = number_of_changes;
-    upd->padding = 0;
-
-    int i = 0;
-    int j = 0;  // slot number
-    while (i + TX_LOG_ENTRIES_PER_CHUNK_LV2 < number_of_changes) {  // a loop for all but the last one
-        memcpy(&(upd->transactions[i]), hdr->chunks[j], sizeof(struct tx_log_entry) * TX_LOG_ENTRIES_PER_CHUNK_LV2);
-        ++j;
-        i += TX_LOG_ENTRIES_PER_CHUNK_LV2;
-    }
-    memcpy(&(upd->transactions[i]), hdr->chunks[j], sizeof(struct tx_log_entry) * (number_of_changes - i));
-    hdr->number_of_changes = 0;
-    hdr->lastCommittedRef = hdr->currentTransactionRef;
-    hdr->currentTransactionRef += hdr->changeNumberDelta;
-    return (jlong)upd;
-}
-
-void replayUpdateOnView(struct tx_log_hdr *hdr, struct tx_log_entry *ep) {
-    ep->affected_table->lastCommittedRef = hdr->currentTransactionRef;
-    struct map *view = ep->affected_table->committedView;
-    if (!view) {
-        // no shadow: simple rule: discard old entry.
-        struct entry *e = ep->old_entry;
-        if (e)
-            free(e);
-    } else {
-        // have secondary view. Do not discard old entry, because we either still need it, or we discard it within a recursive call
-        // we have a view, and are asked to replay the tx on it
-        if (!ep->new_entry) {
-            // was a remove => remove it on the view (which frees the old data)
-            execRemoveShadow(view, ep->old_entry->key);
-        } else {
-            // insert or replace
-            struct entry *shouldBeOld = setPutSubShadow(view, ep->new_entry);
-            if (shouldBeOld != ep->old_entry)
-                fprintf(stderr, "REDO PROBLEM: expected to get %16p, but got %16p for key %ld\n", ep->old_entry, shouldBeOld, ep->new_entry->key);
-            // if new_entry was not null, then free it (it is no longer required)
-            if (ep->old_entry)
-                free(ep->old_entry);
-        }
-        view->lastCommittedRef = hdr->currentTransactionRef;
-    }
-}
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natUpdateViews
- * Signature: (JJ)V
- */
-JNIEXPORT int JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natUpdateViews
-(JNIEnv *env, jobject me, jlong cTx, jlong transactions) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    struct tx_delayed_update *upd = (struct tx_delayed_update *)transactions;
-    if (upd->lastCommittedRef != hdr->lastCommittedRefOnViews) {
-        fprintf(stderr, "current = %ld, lastCommitted = %ld, last committed on views = %ld\n",
-                (long)hdr->currentTransactionRef, (long)hdr->lastCommittedRef, (long)hdr->lastCommittedRefOnViews);
-        throwAny(env, "Invalid sequence of replays");
-        return 0;
-    }
-    int numberOfChanges = upd->numberOfChanges;
-    int i;
-    struct tx_log_entry *ep = upd->transactions;
-    for (i = 0; i < numberOfChanges; ++i) {
-        replayUpdateOnView(hdr, ep++);
-    }
-
-    hdr->lastCommittedRefOnViews = upd->currentTransactionRef;
-    free(upd);
-    return numberOfChanges;
-}
-
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natCommit
- * Signature: (J)I
- */
-JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natCommit
-  (JNIEnv *env, jobject me, jlong cTx) {
-    // currently no redo logs are written. Therefore just discard the entries
-#ifdef DEBUG
-    fprintf(stderr, "COMMIT START\n");
-#endif
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-
-
-    int currentEntries = hdr->number_of_changes;
-    if (currentEntries) {
-        if (hdr->lastCommittedRef != hdr->lastCommittedRefOnViews) {
-            fprintf(stderr, "current = %ld, lastCommitted = %ld, last committed on views = %ld\n",
-                    (long)hdr->currentTransactionRef, (long)hdr->lastCommittedRef, (long)hdr->lastCommittedRefOnViews);
-            throwAny(env, "Invalid sequence of commit");
-            return 0;
-        }
-
-        struct tx_log_list *chunk = NULL;
-        int i;
-        for (i = 0; i < currentEntries; ++i) {
-            if (!(i & 0xff)) {
-                // need a new chunk
-                chunk = hdr->chunks[i >> 8];
-            }
-            replayUpdateOnView(hdr, &(chunk->entries[i & 0xff]));
-        }
-    }
-    hdr->number_of_changes = 0;
-    hdr->lastCommittedRef = hdr->currentTransactionRef;
-    hdr->lastCommittedRefOnViews = hdr->currentTransactionRef;
-    hdr->currentTransactionRef += hdr->changeNumberDelta;
-#ifdef DEBUG
-    fprintf(stderr, "COMMIT END\n");
-#endif
-    return currentEntries;
-}
-
-void rollback(struct tx_log_entry *e) {
-#ifdef DEBUG
-    fprintf(stderr, "Rolling back entry for %16p %16p %16p\n", e->affected_table, e->old_entry, e->new_entry);
-#endif
-    if (!e->old_entry) {
-        // was an insert
-#ifdef DEBUG
-        fprintf(stderr, "    => remove key %ld\n", e->new_entry->key);
-#endif
-        execRemove(NULL, e->affected_table, e->new_entry->key); // TODO: assert new entry was returned
-        // as old_entry was null, new_entry is definitely not null and must be deallocated
-        // free(e->new_entry);  // but this was done within execRenove already!
-    } else {
-        // replace or delete
-#ifdef DEBUG
-        fprintf(stderr, "    => insert / update %16p with key %ld\n", e->old_entry, e->old_entry->key);
-#endif
-        struct entry *shouldBeNew = setPutSub(e->affected_table, e->old_entry);
-        if (shouldBeNew != e->new_entry)
-            fprintf(stderr, "ROLLBACK PROBLEM: expected to get %16p, but got %16p for key %ld\n", e->new_entry, shouldBeNew, e->old_entry->key);
-        // if new_entry was not null, then free it (it is no longer required)
-        if (e->new_entry)
-            free(e->new_entry);
-    }
-}
-
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natDebugRedoLog
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natDebugRedoLog
-  (JNIEnv *env, jobject me, jlong cTx) {
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    int currentEntries = hdr->number_of_changes;
-    int i;
-    for (i = 0; i < currentEntries; ++i) {
-        struct tx_log_list *chunk = hdr->chunks[i >> 8];
-        struct tx_log_entry *loge = &chunk->entries[i & 0xff];
-        jlong key = loge->new_entry ? loge->new_entry->key : loge->old_entry->key;
-        fprintf(stderr, "redo log entry %5d is for key %16ld: old=%16p, new=%16p\n", i, key, loge->old_entry, loge->new_entry);
-    }
-}
 
 
 
 /** Record a row change. Returns an error if anything went wrong. */
-char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *oldData, struct entry *newData) {
+int record_change(JNIEnv *env, struct tx_log_hdr *ctx, struct map *mapdata, struct dataEntry *oldData, struct dataEntry *newData) {
     if (!IS_TRANSACTIONAL(ctx, mapdata)) {
         // no transaction log. Maybe free old data
         if (oldData)
             free(oldData);
-        return NULL;
+        return 0;
     }
-    int chunkIndex = ctx->number_of_changes >> 8;
-    if (chunkIndex >= TX_LOG_ENTRIES_PER_CHUNK_LV1) {
-        return "Too many row changes within transaction";
-    }
-    struct tx_log_list *chunk = ctx->chunks[chunkIndex];
-    if (!chunk) {
-        // must allocate
-        chunk = malloc(sizeof(struct tx_log_list));
-        if (!chunk)
-            return "Out of memory recording rollback info";
-        ctx->chunks[chunkIndex] = chunk;
-    }
-    struct tx_log_entry *loge = &(chunk->entries[ctx->number_of_changes & 0xff]);
+
+    struct tx_log_entry *loge = getTxLogEntry(env, ctx);
+    if (!loge)
+        return 1;  // error
 #ifdef DEBUG
     fprintf(stderr, "Storing rollback data %6d at %16p: map=%16p old=%16p new=%16p\n", ctx->number_of_changes, loge, mapdata, oldData, newData);
 #endif
@@ -489,36 +214,9 @@ char *record_change(struct tx_log_hdr *ctx, struct map *mapdata, struct entry *o
     loge->old_entry = oldData;
     loge->new_entry = newData;
     ++(ctx->number_of_changes);
-    return NULL;
+    return 0;
 }
 
-
-/*
- * Class:     de_jpaw_offHeap_OffHeapTransaction
- * Method:    natRollback
- * Signature: (JI)V
- */
-JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
-  (JNIEnv *env, jobject me, jlong cTx, jint rollbackTo) {
-#ifdef DEBUG
-    fprintf(stderr, "ROLLBACK START (%d)\n", rollbackTo);
-#endif
-    struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
-    int currentEntries = hdr->number_of_changes;
-    if (currentEntries > rollbackTo) {
-        struct tx_log_list *chunk = hdr->chunks[currentEntries >> 8];
-        while (currentEntries > rollbackTo) {
-            if (!(currentEntries & 0xff))
-                chunk = hdr->chunks[(currentEntries-1) >> 8];
-            --currentEntries;
-            rollback(&(chunk->entries[currentEntries & 0xff]));
-        }
-        hdr->number_of_changes = rollbackTo;
-    }
-#ifdef DEBUG
-    fprintf(stderr, "ROLLBACK END\n");
-#endif
-}
 
 
 /*
@@ -538,10 +236,10 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natOpen
     mapdata->hashTableSize = size;
     mapdata->modes = mode;
     mapdata->count = 0;
-    mapdata->padding = 0;
+    mapdata->mapType = MAP_TYPE_DATA_AND_VIEW;
     mapdata->lastCommittedRef = -1L;
     mapdata->committedView = NULL;
-    mapdata->data = calloc(size, sizeof(struct entry *));
+    mapdata->data = calloc(size, sizeof(struct dataEntry *));
     if (!mapdata->data) {
         free(mapdata);
         throwOutOfMemory(env);
@@ -559,7 +257,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natOpen
         mapdata->committedView = view;
 
         view->modes = 0;        // the committed view does not have any TX management
-        view->data = calloc(size, sizeof(struct entry *));
+        view->data = calloc(size, sizeof(struct dataEntry *));
         if (!view->data) {
             free(view);
             free(mapdata->data);
@@ -590,12 +288,12 @@ int computeHash(jlong arg, int size) {
 }
 
 // clear all entries
-void clear(struct entry **data, int numEntries) {
+void clear(struct dataEntry **data, int numEntries) {
     int i;
     for (i = 0; i < numEntries; ++i) {
-        struct entry *p = data[i];
+        struct dataEntry *p = data[i];
         while (p) {
-            register struct entry *next = p->nextSameHash;
+            register struct dataEntry *next = p->nextSameHash;
             free(p);
             p = next;
         }
@@ -644,20 +342,20 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClear
     } else {
         int hash;
         for (hash = 0; hash < mapdata->hashTableSize; ++hash) {
-            struct entry *e;
+            struct dataEntry *e;
             for (e = mapdata->data[hash]; e; e = e->nextSameHash) {
 #ifdef DEBUG
                 fprintf(stderr, "Transactional clear of entry %16p in hash slot %d\n", e, hash);
 #endif
-                record_change(ctx, mapdata, e, NULL);
+                record_change(env, ctx, mapdata, e, NULL);  // may throw an error....
             }
         }
     }
-    memset(mapdata->data, 0, mapdata->hashTableSize * sizeof(struct entry *));     // set the initial pointers to NULL
+    memset(mapdata->data, 0, mapdata->hashTableSize * sizeof(struct dataEntry *));     // set the initial pointers to NULL
     mapdata->count = 0;
 }
 
-static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
+static jbyteArray toJavaByteArray(JNIEnv *env, struct dataEntry *e) {
     if (!e)
         return (jbyteArray) 0;
     jbyteArray result = (*env)->NewByteArray(env, e->uncompressedSize);
@@ -692,9 +390,9 @@ static jbyteArray toJavaByteArray(JNIEnv *env, struct entry *e) {
 }
 
 
-struct entry *find_entry(struct map *mapdata, jlong key) {
+struct dataEntry *find_entry(struct map *mapdata, jlong key) {
     int hash = computeHash(key, mapdata->hashTableSize);
-    struct entry *e = mapdata->data[hash];
+    struct dataEntry *e = mapdata->data[hash];
     while (e) {
         // check if this is a match
         if (e->key == key)
@@ -712,7 +410,7 @@ struct entry *find_entry(struct map *mapdata, jlong key) {
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGet
     (JNIEnv *env, jobject me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *e = find_entry(mapdata, key);
+    struct dataEntry *e = find_entry(mapdata, key);
     return toJavaByteArray(env, e);
 }
 
@@ -724,7 +422,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natLength
     (JNIEnv *env, jobject me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *e = find_entry(mapdata, key);
+    struct dataEntry *e = find_entry(mapdata, key);
     return (jint)(e ? e->uncompressedSize : -1);
 }
 
@@ -736,17 +434,18 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natLe
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natCompressedLength
     (JNIEnv *env, jobject me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *e = find_entry(mapdata, key);
+    struct dataEntry *e = find_entry(mapdata, key);
     return (jint)(e ? e->compressedSize : -1);
 }
 
 
 
 // remove an entry for a key. If transactions are active, redo log / rollback info will be stored. Else the entry no longer required will be freed.
-jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
+// JNIEnv may be NULL if ctx is NULL
+jboolean execRemove(JNIEnv *env, struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
     int hash = computeHash(key, mapdata->hashTableSize);
-    struct entry *prev = NULL;
-    struct entry *e = mapdata->data[hash];
+    struct dataEntry *prev = NULL;
+    struct dataEntry *e = mapdata->data[hash];
     while (e) {
         // check if this is a match
         if (e->key == key) {
@@ -759,7 +458,7 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
 #ifdef DEBUG
             fprintf(stderr, "Removing an entry of key %ld in slot %d\n", (long)key, hash);
 #endif
-            record_change(ctx, mapdata, e, NULL);
+            record_change(env, ctx, mapdata, e, NULL); // may throw an error
             --mapdata->count;
             return JNI_TRUE;
         }
@@ -773,11 +472,11 @@ jboolean execRemove(struct tx_log_hdr *ctx, struct map *mapdata, jlong key) {
     return JNI_FALSE;
 }
 
-// remove an entry for a key. If transactions are active, redo log / rollback info will be stored. Else the entry no longer required will be freed.
+// remove an entry for a key
 jboolean execRemoveShadow(struct map *mapdata, jlong key) {
     int hash = computeHash(key, mapdata->hashTableSize);
-    struct entry *prev = NULL;
-    struct entry *e = mapdata->data[hash];
+    struct dataEntry *prev = NULL;
+    struct dataEntry *e = mapdata->data[hash];
     while (e) {
         // check if this is a match
         if (e->key == key) {
@@ -811,7 +510,7 @@ jboolean execRemoveShadow(struct map *mapdata, jlong key) {
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natDelete
     (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
-    return execRemove((struct tx_log_hdr *)ctx, (struct map *) cMap, key);
+    return execRemove(env, (struct tx_log_hdr *)ctx, (struct map *) cMap, key);
 }
 
 
@@ -824,8 +523,8 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_nat
     (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key) {
     struct map *mapdata = (struct map *) cMap;
     int hash = computeHash(key, mapdata->hashTableSize);
-    struct entry *prev = NULL;
-    struct entry *e = mapdata->data[hash];
+    struct dataEntry *prev = NULL;
+    struct dataEntry *e = mapdata->data[hash];
     while (e) {
         // check if this is a match
         if (e->key == key) {
@@ -836,7 +535,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_nat
                 prev->nextSameHash = e->nextSameHash;
             }
             jbyteArray result = toJavaByteArray(env, e);
-            record_change((struct tx_log_hdr *)ctx, mapdata, e, NULL);
+            record_change(env, (struct tx_log_hdr *)ctx, mapdata, e, NULL); // may throw an error
             --mapdata->count;
             return result;
         }
@@ -847,13 +546,13 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_nat
 }
 
 
-struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
+struct dataEntry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     // int uncompressed_length = (*env)->GetArrayLength(env, data);
-    struct entry *e;
+    struct dataEntry *e;
     if (doCompress) {
         // compress the data. Allocate a target buffer
         int max_compressed_length = ROUND_UP_SIZE(LZ4_compressBound(length));
-        struct entry *tmp_dst = malloc(sizeof(struct entry) + max_compressed_length);
+        struct dataEntry *tmp_dst = malloc(sizeof(struct dataEntry) + max_compressed_length);
         if (!tmp_dst) {
             return NULL;  // will throw OOM
         }
@@ -882,7 +581,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
         int actual_rounded_length = ROUND_UP_SIZE(actual_compressed_length);
         // if we need less than initially allocated, realloc to free the space.
         if (actual_rounded_length < max_compressed_length) {
-            e = realloc(tmp_dst, sizeof(struct entry) + actual_rounded_length);
+            e = realloc(tmp_dst, sizeof(struct dataEntry) + actual_rounded_length);
             if (!e)
                 e = tmp_dst;
         } else {
@@ -890,7 +589,7 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
         }
         e->compressedSize = actual_compressed_length;
     } else {
-        e = (struct entry *)malloc(sizeof(struct entry) + ROUND_UP_SIZE(length));
+        e = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
         if (!e)
             return NULL;  // will throw OOM
         e->compressedSize = 0;
@@ -903,14 +602,14 @@ struct entry *create_new_entry(JNIEnv *env, jlong key, jbyteArray data, jint off
 }
 
 
-struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
+struct dataEntry * setPutSub(struct map *mapdata, struct dataEntry *newEntry) {
     jlong key = newEntry->key;
     int hash = computeHash(key, mapdata->hashTableSize);
-    struct entry *e = mapdata->data[hash];
+    struct dataEntry *e = mapdata->data[hash];
     newEntry->nextSameHash = e;  // insert it at the start
     newEntry->key = key;
     mapdata->data[hash] = newEntry;
-    struct entry *prev = newEntry;
+    struct dataEntry *prev = newEntry;
 
     while (e) {
         // check if this is a match
@@ -932,14 +631,14 @@ struct entry * setPutSub(struct map *mapdata, struct entry *newEntry) {
     ++mapdata->count;
     return NULL;
 }
-struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry) {
+struct dataEntry * setPutSubShadow(struct map *mapdata, struct dataEntry *newEntry) {
     jlong key = newEntry->key;
     int hash = computeHash(key, mapdata->hashTableSize);
-    struct entry *e = mapdata->data[hash];
+    struct dataEntry *e = mapdata->data[hash];
     newEntry->nextInCommittedView = e;  // insert it at the start
     newEntry->key = key;
     mapdata->data[hash] = newEntry;
-    struct entry *prev = newEntry;
+    struct dataEntry *prev = newEntry;
 
     while (e) {
         // check if this is a match
@@ -971,14 +670,14 @@ struct entry * setPutSubShadow(struct map *mapdata, struct entry *newEntry) {
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natSet
     (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
+    struct dataEntry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
         return JNI_FALSE;
     }
 
-    struct entry *previousEntry = setPutSub(mapdata, newEntry);
-    record_change((struct tx_log_hdr *)ctx, mapdata, previousEntry, newEntry);
+    struct dataEntry *previousEntry = setPutSub(mapdata, newEntry);
+    record_change(env, (struct tx_log_hdr *)ctx, mapdata, previousEntry, newEntry);  // may throw an error
     return (previousEntry == NULL);  // true if it was a new entry
 }
 
@@ -990,20 +689,20 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natSe
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natPut
     (JNIEnv *env, jobject me, jlong cMap, jlong ctx, jlong key, jbyteArray data, jint offset, jint length, jboolean doCompress) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
+    struct dataEntry *newEntry = create_new_entry(env, key, data, offset, length, doCompress);
     if (!newEntry) {
         throwOutOfMemory(env);
         return NULL;
     }
 
-    struct entry *previousEntry = setPutSub(mapdata, newEntry);
+    struct dataEntry *previousEntry = setPutSub(mapdata, newEntry);
     jbyteArray result = toJavaByteArray(env, previousEntry);
-    record_change((struct tx_log_hdr *)ctx, mapdata, previousEntry, newEntry);
+    record_change(env, (struct tx_log_hdr *)ctx, mapdata, previousEntry, newEntry);  // may throw an error
     return result;
 }
 
 
-int computeChainLength(struct entry *e) {
+static int computeChainLength(struct dataEntry *e) {
     register int len = 0;
     while (e) {
         ++len;
@@ -1049,7 +748,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGe
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetIntoPreallocated
   (JNIEnv *env, jobject me, jlong cMap, jlong key, jbyteArray target, jint offset) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *e = find_entry(mapdata, key);
+    struct dataEntry *e = find_entry(mapdata, key);
     if (!e)
         return -1;  // key does not exist
     int targetSize = (*env)->GetArrayLength(env, target);
@@ -1073,7 +772,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGe
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetRegion
   (JNIEnv *env, jobject me, jlong cMap, jlong key, jint offset, jint length) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *e = find_entry(mapdata, key);
+    struct dataEntry *e = find_entry(mapdata, key);
     if (!e)
         return (jbyteArray)0;
     if (e->compressedSize) {
@@ -1095,7 +794,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetField
   (JNIEnv *env, jobject me, jlong cMap, jlong key, jint fieldNo, jbyte delimiter, jbyte nullIndicator) {
     struct map *mapdata = (struct map *) cMap;
-    struct entry *e = find_entry(mapdata, key);
+    struct dataEntry *e = find_entry(mapdata, key);
     if (!e)
         return (jbyteArray)0;
     if (e->compressedSize) {
@@ -1173,7 +872,7 @@ int transferWrite(const int fd, char *buffer, int oldOffset, void const *src, in
             if (len & 7) {
                 char *p = buffer+oldOffset+len;
                 do {
-                    *p++ = 0xee;
+                    *p++ = (char)0xee;
                 } while (++len & 7);
             }
             return oldOffset + len;
@@ -1253,7 +952,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natWriteT
     // write the entries
     int i;
     for (i = 0; i < mapdata->hashTableSize; ++i) {
-        struct entry *e;
+        struct dataEntry *e;
         for (e = mapdata->data[i]; e; e = (fromCommittedView ? e->nextInCommittedView : e->nextSameHash)) {
             int rawSize = e->compressedSize ? e->compressedSize : e->uncompressedSize;
             int finalSize = 2 * sizeof(int) + sizeof(jlong) + rawSize;
@@ -1316,7 +1015,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natReadFr
     int i;
     for (i = 0; i < hdr.numberOfRecords; ++i) {
         // read the entry header: key, uncompressed & compressed size
-        struct entry entryHdr;
+        struct dataEntry entryHdr;
         if (fread(&(entryHdr.uncompressedSize), ENTRY_HDR_SIZE, 1, fp) != 1) {
             free(buffer);
             fclose(fp);
@@ -1324,7 +1023,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natReadFr
             return;
         }
         int actualSize = entryHdr.compressedSize ? entryHdr.compressedSize : entryHdr.uncompressedSize;
-        struct entry *e = malloc(sizeof(struct entry) + ROUND_UP_SIZE(actualSize));
+        struct dataEntry *e = malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(actualSize));
         if (!e) {
             free(buffer);
             fclose(fp);
@@ -1354,7 +1053,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natReadFr
     if (viewdata) {
         // transfer everything from main view to committed view as well
         // assumes same hashtablesize
-        memcpy(viewdata->data, mapdata->data, sizeof(struct entry *) * mapdata->hashTableSize);
+        memcpy(viewdata->data, mapdata->data, sizeof(struct dataEntry *) * mapdata->hashTableSize);
         viewdata->count = mapdata->count;
         viewdata->lastCommittedRef = mapdata->lastCommittedRef;
     }
