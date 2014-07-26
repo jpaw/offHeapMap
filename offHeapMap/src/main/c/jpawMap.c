@@ -32,6 +32,12 @@ struct dataEntry {
     char data[];
 };
 
+// overloaded methods
+struct fctnPtrs {
+    void (*commitToView)(struct tx_log_entry *ep, jlong transactionReference);
+    void (*rollback)(struct tx_log_entry *ep);
+    void (*print)(struct tx_log_entry *ep, int i);
+};
 
 struct map {
     int mapType;            // dataMap, indexMap, unique flag, organization, has view

@@ -9,8 +9,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lz4.version>1.2.0</lz4.version>
-        <xtend.version>2.6.0</xtend.version>            <!-- UPTODATE 2014-05-21 -->
-        <xtext.version>2.6.0</xtext.version>            <!-- UPTODATE 2014-05-21 -->
+        <xtend.version>2.6.2</xtend.version>            <!-- UPTODATE 2014-07-03 -->
+        <xtext.version>2.6.2</xtext.version>            <!-- UPTODATE 2014-07-03 -->
         <slf4j.version>1.7.7</slf4j.version>            <!-- http://www.slf4j.org/ UPTODATE 2014-04-04 -->
         <logback.version>1.1.2</logback.version>        <!-- http://logback.qos.ch/ UPTODATE 2014-04-02 -->
         <guava.version>16.0.1</guava.version>           <!-- http://code.google.com/p/guava-libraries/ -->
@@ -19,7 +19,6 @@
         <junit.version>4.11</junit.version>
         
         <!-- Some more versions, used by specific dependent projects -->
-        <netty.version>4.0.19.Final</netty.version>     <!-- https://netty.io/news/ UPTODATE 2014-05-01 -->
         <jsap.version>2.1</jsap.version>
         
         <!--  benchmarking -->
