@@ -4,14 +4,14 @@ import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeUnit;
 
 import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.GenerateMicroBenchmark;
+import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.logic.BlackHole;
+import org.openjdk.jmh.infra.Blackhole;
 
 import de.jpaw.offHeap.LongToByteArrayOffHeapMap;
 import de.jpaw.offHeap.OffHeapTransaction;
@@ -155,105 +155,105 @@ public class OffHeapMapBench {
         transaction.close();
     }
     
-    @GenerateMicroBenchmark
-    public void sizeOpNoTx(BlackHole bh) {
+    @Benchmark
+    public void sizeOpNoTx(Blackhole bh) {
         bh.consume(mapNoTransactions.size());
     }
 
-    @GenerateMicroBenchmark
-    public void sizeOpWithTx(BlackHole bh) {
+    @Benchmark
+    public void sizeOpWithTx(Blackhole bh) {
         bh.consume(mapWithTransactions.size());
     }
 
-    @GenerateMicroBenchmark
+    @Benchmark
     public void commitOpNoRows() {
         transaction.commit();
     }
 
     
     
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insertSmallOpNoTx() {
         mapNoTransactions.set(KEY, SHORTDATA);
     }
 
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insert1KBOpNoTx() {
         mapNoTransactions.set(KEY, data1KB);
     }
 
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insertCompressedSmallOpNoTx() {
         mapNoTransactionsComp.set(KEY, SHORTDATA);
     }
 
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insertCompressed1KBOpNoTx() {
         mapNoTransactionsComp.set(KEY, data1KB);
     }
 
 
     
-    @GenerateMicroBenchmark
-    public void getSmallOp(BlackHole bh) {
+    @Benchmark
+    public void getSmallOp(Blackhole bh) {
         bh.consume(mapNoTransactions.get(KEY_PERM_SMALL));
     }
     
-    @GenerateMicroBenchmark
-    public void get1KBOp(BlackHole bh) {
+    @Benchmark
+    public void get1KBOp(Blackhole bh) {
         bh.consume(mapNoTransactions.get(KEY_PERM_1KB));
     }
     
-    @GenerateMicroBenchmark
-    public void getSmallCompressedOp(BlackHole bh) {
+    @Benchmark
+    public void getSmallCompressedOp(Blackhole bh) {
         bh.consume(mapNoTransactionsComp.get(KEY_PERM_SMALL));
     }
     
-    @GenerateMicroBenchmark
-    public void get1KBCompressedOp(BlackHole bh) {
+    @Benchmark
+    public void get1KBCompressedOp(Blackhole bh) {
         bh.consume(mapNoTransactionsComp.get(KEY_PERM_1KB));
     }
 
 
     
-    @GenerateMicroBenchmark
-    public void insertGetOpNoTx(BlackHole bh) {
+    @Benchmark
+    public void insertGetOpNoTx(Blackhole bh) {
         mapNoTransactions.set(KEY, SHORTDATA);
         bh.consume(mapNoTransactions.get(KEY));
     }
 
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insertDeleteOpNoTx() {
         mapNoTransactions.set(KEY, SHORTDATA);
         mapNoTransactions.delete(KEY);
     }
     
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insertCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
         transaction.commit();
     }
     
-    @GenerateMicroBenchmark
-    public void insertCommitGetOp(BlackHole bh) {
+    @Benchmark
+    public void insertCommitGetOp(Blackhole bh) {
         mapWithTransactions.set(KEY, SHORTDATA);
         transaction.commit();
         bh.consume(mapWithTransactions.get(KEY));
     }
 
-    @GenerateMicroBenchmark
+    @Benchmark
     public void insertDeleteCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
         mapWithTransactions.delete(KEY);
         transaction.commit();
     }
     
-    @GenerateMicroBenchmark
+    @Benchmark
     public void deleteOpNoTx() {
         mapNoTransactions.delete(KEY);
     }
     
-    @GenerateMicroBenchmark
+    @Benchmark
     public void deleteOpWithTx() {
         mapWithTransactions.delete(KEY);
         transaction.commit();
