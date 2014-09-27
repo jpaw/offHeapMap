@@ -4,7 +4,9 @@ import java.util.Iterator;
 
 public interface PrimitiveLongKeyMapView<V> extends Iterable<PrimitiveLongKeyMapView.Entry<V>> {
     interface Entry<V> {
+        @Override
         public boolean equals(Object o);
+        @Override
         public int hashCode();
         public long getKey();
         public V getValue();
@@ -38,5 +40,6 @@ public interface PrimitiveLongKeyMapView<V> extends Iterable<PrimitiveLongKeyMap
 //    public Set<PrimitiveLongKeyMap.Entry<V>> entrySet();
 
     // EXTRA!
+    @Override
     public Iterator<PrimitiveLongKeyMapView.Entry<V>> iterator();
 }

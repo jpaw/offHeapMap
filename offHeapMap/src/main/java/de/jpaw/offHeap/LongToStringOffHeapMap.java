@@ -23,7 +23,7 @@ public class LongToStringOffHeapMap extends  PrimitiveLongKeyOffHeapMap<String> 
         public String byteArrayToValueType(byte[] arg) {
             return arg != null ? new String(arg, encoding) : null;
         }
-    };
+    }
     private static final StringConverter DEFAULT_CONVERTER = new StringConverter(StandardCharsets.UTF_8);
 
     protected LongToStringOffHeapMap(ByteArrayConverter<String> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
@@ -38,6 +38,7 @@ public class LongToStringOffHeapMap extends  PrimitiveLongKeyOffHeapMap<String> 
         public Builder(Charset encoding) {
             super(new StringConverter(encoding));
         }
+        @Override
         public LongToStringOffHeapMap build() {
             return new LongToStringOffHeapMap(converter, hashSize, shard, mode, withCommittedView);
         }

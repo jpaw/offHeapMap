@@ -25,6 +25,7 @@ public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte [
         public Builder() {
             super(myConverter);
         }
+        @Override
         public LongToByteArrayOffHeapMap build() {
             return new LongToByteArrayOffHeapMap(converter, hashSize, shard, mode, withCommittedView);
         }
