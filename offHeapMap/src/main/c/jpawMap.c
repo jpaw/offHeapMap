@@ -4,10 +4,6 @@
 #define USE_CRITICAL_FOR_STORE
 // #define USE_CRITICAL_FOR_RETRIEVAL       // this seems to be much slower!
 
-#define SEPARATE_COMMITTED_VIEW
-#define ADD_INDEX
-
-
 
 // round the size to be allocated to the next multiple of 16, because malloc anyway returns multiples of 16.
 #define ROUND_UP_SIZE(size)     ((((size) - 1) & ~0x0f) + 16)
