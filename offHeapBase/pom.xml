@@ -24,6 +24,35 @@
         <jmh.version>1.0.1</jmh.version>                <!-- http://openjdk.java.net/projects/code-tools/jmh/ UPTODATE 2014-07-24 -->
     </properties>
 
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>mbi</id>
+            <name>Michael Bischoff</name>
+            <email>jpaw@online.de</email>
+            <url>http://www.jpaw.de</url>
+        </developer>
+    </developers>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>repo-snapshots</id>
+            <name>repo-snapshots</name>
+            <url>${repo.url}/libs-snapshot-local</url>
+        </snapshotRepository>
+        <repository>
+            <id>repo-releases</id>
+            <name>repo-releases</name>
+            <url>${repo.url}/libs-release-local</url>
+        </repository>
+    </distributionManagement>
+
     <dependencies>
         <dependency>
             <groupId>net.jpountz.lz4</groupId>
