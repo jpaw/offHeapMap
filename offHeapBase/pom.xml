@@ -1,57 +1,20 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>de.jpaw</groupId>
+    <parent>
+        <groupId>de.jpaw</groupId>
+        <artifactId>jpaw-se-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath/>
+    </parent>
+
     <artifactId>offHeapBase</artifactId>
     <version>0.0.3-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lz4.version>1.2.0</lz4.version>
-        <xtend.version>2.7.3</xtend.version>            <!-- UPTODATE 2014-11-20 -->
-        <slf4j.version>1.7.7</slf4j.version>            <!-- http://www.slf4j.org/ UPTODATE 2014-04-04 -->
-        <logback.version>1.1.2</logback.version>        <!-- http://logback.qos.ch/ UPTODATE 2014-04-02 -->
-        <guava.version>18.0</guava.version>             <!-- http://code.google.com/p/guava-libraries/ -->
-        <jodatime.version>2.5</jodatime.version>        <!-- UPTODATE 2014-09-01 -->
-        <testng.version>6.8.8</testng.version>         <!-- UPTODATE 2014-11-20 -->
-        <junit.version>4.11</junit.version>
-        
-        <!-- Some more versions, used by specific dependent projects -->
-        <jsap.version>2.1</jsap.version>
-        
-        <!--  benchmarking -->
-        <jmh.version>1.0.1</jmh.version>                <!-- http://openjdk.java.net/projects/code-tools/jmh/ UPTODATE 2014-07-24 -->
     </properties>
-
-    <licenses>
-        <license>
-            <name>The Apache Software License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-        </license>
-    </licenses>
-
-    <developers>
-        <developer>
-            <id>mbi</id>
-            <name>Michael Bischoff</name>
-            <email>jpaw@online.de</email>
-            <url>http://www.jpaw.de</url>
-        </developer>
-    </developers>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>repo-snapshots</id>
-            <name>repo-snapshots</name>
-            <url>${repo.url}/libs-snapshot-local</url>
-        </snapshotRepository>
-        <repository>
-            <id>repo-releases</id>
-            <name>repo-releases</name>
-            <url>${repo.url}/libs-release-local</url>
-        </repository>
-    </distributionManagement>
 
     <dependencies>
         <dependency>
@@ -67,7 +30,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.2</version>
+                    <version>${compiler.plugin.version}</version>
                     <configuration>
                         <source>1.8</source>
                         <target>1.8</target>

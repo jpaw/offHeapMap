@@ -40,7 +40,7 @@
  -->            
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
-                <version>1.7</version>
+                <version>${antrun.plugin.version}</version>
                 <executions>
                     <execution>
                         <phase>process-classes</phase>
@@ -78,7 +78,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-clean-plugin</artifactId>
-                <version>2.5</version>
+                <version>${clean.plugin.version}</version>
                 <configuration>
                     <filesets>
                         <fileset>
@@ -93,7 +93,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.14</version>
+                <version>${surefire.plugin.version}</version>
                 <configuration>
                     <!-- cannot use target/lib because we depend on additional 4rd party libraries (lz4), which are not in this project -->
                     <argLine>-Djava.library.path=${user.home}/lib</argLine>
