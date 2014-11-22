@@ -3,12 +3,12 @@
     
     <parent>
         <groupId>de.jpaw</groupId>
-        <artifactId>offHeapBase</artifactId>
+        <artifactId>offheap-base</artifactId>
         <version>0.0.3-SNAPSHOT</version>
-        <relativePath>../offHeapBase/pom.xml</relativePath>
+        <relativePath>../offheap-base/pom.xml</relativePath>
     </parent>
     
-    <artifactId>offHeapMap</artifactId>
+    <artifactId>offheap-core</artifactId>
     <packaging>jar</packaging>
     
     <dependencies>

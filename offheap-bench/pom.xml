@@ -3,18 +3,18 @@
     
     <parent>
         <groupId>de.jpaw</groupId>
-        <artifactId>offHeapBase</artifactId>
+        <artifactId>offheap-base</artifactId>
         <version>0.0.3-SNAPSHOT</version>
-        <relativePath>../offHeapBase/pom.xml</relativePath>
+        <relativePath>../offheap-base/pom.xml</relativePath>
     </parent>
     
-    <artifactId>offHeapBench</artifactId>
+    <artifactId>offheap-bench</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
             <groupId>de.jpaw</groupId>
-            <artifactId>offHeapMap</artifactId>
+            <artifactId>offheap-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -43,7 +43,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>offHeapBench</finalName>
+                            <finalName>offheap-bench</finalName>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>org.openjdk.jmh.Main</mainClass>

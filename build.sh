@@ -9,4 +9,4 @@ echo "Cleaning repo folder..."
 git clean -fdx
 
 echo "executing mvn $GOAL..."
-(cd offHeapBase && mvn $GOAL)
+(cd offheap-base && mvn $GOAL)

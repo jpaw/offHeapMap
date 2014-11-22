@@ -18,7 +18,7 @@ import de.jpaw.offHeap.OffHeapTransaction;
 import de.jpaw.offHeap.Shard;
 
 // Invocation:
-// java -Djava.library.path=$HOME/lib -jar target/offHeapBench.jar -i 3 -f 3 -wf 1 -wi 3
+// java -Djava.library.path=$HOME/lib -jar target/offheap-bench.jar -i 3 -f 3 -wf 1 -wi 3
 //
 // output on an Intel i7 980
 //
