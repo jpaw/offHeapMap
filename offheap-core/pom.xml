@@ -1,0 +1,114 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <parent>
+        <groupId>de.jpaw</groupId>
+        <artifactId>offheap-base</artifactId>
+        <version>0.0.3</version>
+        <relativePath>../offheap-base/pom.xml</relativePath>
+    </parent>
+    
+    <artifactId>offheap-core</artifactId>
+    <packaging>jar</packaging>
+    
+    <dependencies>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>${testng.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+<!--        could not get it to work with the latest Oracle JDK
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <version>1.0-alpha-8</version>
+                <configuration>
+                    <javahOutputDirectory>${project.build.directory}/src/main/c</javahOutputDirectory>
+                </configuration>
+            </plugin>
+ -->            
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${antrun.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>process-classes</phase>
+                        <configuration>
+                            <target
+                                name="jni"
+                                description="Generate headers and compile the native code">
+                                <echo>Generating JNI headers</echo>
+                                <!-- Does not work with OpenJDK, because Ant javah assumes Sun JVM
+                                <javah
+                                    destdir="${project.basedir}/src/main/c"
+                                    classpath="${project.build.outputDirectory}">
+                                    <class name="de.jpaw.offHeap.LongToByteArrayOffHeapMap"/>
+                                </javah>
+                                 -->
+                                <exec executable="javah" >
+                                    <arg value="-o" />
+                                    <arg value="${project.basedir}/src/main/c/jpawMap.h" />
+                                    <arg value="-classpath" />
+                                    <arg value="${project.build.outputDirectory}" />
+                                    <arg value="-force" />
+                                    <arg value="de.jpaw.offHeap.PrimitiveLongKeyOffHeapMap" />
+                                    <arg value="de.jpaw.offHeap.PrimitiveLongKeyOffHeapMapView" />
+                                    <arg value="de.jpaw.offHeap.OffHeapTransaction" />
+                                </exec>
+
+                                <exec executable="make" ></exec>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>${clean.plugin.version}</version>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>test-output</directory>
+                            <includes>
+                                <include>**</include>
+                            </includes>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${surefire.plugin.version}</version>
+                <configuration>
+                    <!-- cannot use target/lib because we depend on additional 4rd party libraries (lz4), which are not in this project -->
+                    <argLine>-Djava.library.path=${user.home}/lib</argLine>
+                    
+<!-- This does not work:
+                    <systemProperties>
+                        <property>
+                            <name>java.library.path</name>
+                            <value>${user.home}/lib</value>
+                        </property>
+                    </systemProperties>
+ -->                    
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
