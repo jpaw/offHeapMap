@@ -42,6 +42,7 @@
     </build>
     
     <modules>
+        <module>../offheap-bom/pom.xml</module>
         <module>../offheap-core/pom.xml</module>
         <module>../offheap-bench/pom.xml</module>
     </modules>
