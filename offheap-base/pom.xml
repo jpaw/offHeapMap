@@ -4,16 +4,16 @@
     <parent>
         <groupId>de.jpaw</groupId>
         <artifactId>jpaw-se-parent</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
         <relativePath/>
     </parent>
 
     <artifactId>offheap-base</artifactId>
-    <version>0.0.3</version>
+    <version>0.1.0</version>
     <packaging>pom</packaging>
 
     <properties>
-        <lz4.version>1.2.0</lz4.version>
+        <lz4.version>1.3.0</lz4.version>            <!-- 2014-11-14 -->
     </properties>
 
     <dependencies>
@@ -42,6 +42,7 @@
     </build>
     
     <modules>
+        <module>../offheap-bom/pom.xml</module>
         <module>../offheap-core/pom.xml</module>
         <module>../offheap-bench/pom.xml</module>
     </modules>
