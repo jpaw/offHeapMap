@@ -29,7 +29,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natGetVi
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClose
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -37,7 +37,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClose
  * Signature: (JJ)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClear
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -45,7 +45,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natClear
  * Signature: (J[BZ)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natWriteToFile
-  (JNIEnv *, jobject, jlong, jbyteArray, jboolean);
+  (JNIEnv *, jclass, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -53,7 +53,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natWriteT
  * Signature: (J[B)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natReadFromFile
-  (JNIEnv *, jobject, jlong, jbyteArray);
+  (JNIEnv *, jclass, jlong, jbyteArray);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -61,7 +61,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natReadFr
  * Signature: (JJJ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natDelete
-  (JNIEnv *, jobject, jlong, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -69,7 +69,7 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natDe
  * Signature: (JJJ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natRemove
-  (JNIEnv *, jobject, jlong, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -77,7 +77,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_nat
  * Signature: (JJJ[BIIZ)Z
  */
 JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natSet
-  (JNIEnv *, jobject, jlong, jlong, jlong, jbyteArray, jint, jint, jboolean);
+  (JNIEnv *, jclass, jlong, jlong, jlong, jbyteArray, jint, jint, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap
@@ -85,7 +85,7 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natSe
  * Signature: (JJJ[BIIZ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natPut
-  (JNIEnv *, jobject, jlong, jlong, jlong, jbyteArray, jint, jint, jboolean);
+  (JNIEnv *, jclass, jlong, jlong, jlong, jbyteArray, jint, jint, jboolean);
 
 #ifdef __cplusplus
 }
@@ -123,7 +123,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natIn
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetSize
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -131,7 +131,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGe
  * Signature: (JJ)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natLength
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -139,7 +139,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natLe
  * Signature: (JJ)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natCompressedLength
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -147,7 +147,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natCo
  * Signature: (JJ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGet
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -155,7 +155,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Signature: (J[I)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetHistogram
-  (JNIEnv *, jobject, jlong, jintArray);
+  (JNIEnv *, jclass, jlong, jintArray);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -163,7 +163,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGe
  * Signature: (JJ[BI)I
  */
 JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetIntoPreallocated
-  (JNIEnv *, jobject, jlong, jlong, jbyteArray, jint);
+  (JNIEnv *, jclass, jlong, jlong, jbyteArray, jint);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -171,7 +171,7 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGe
  * Signature: (JJII)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetRegion
-  (JNIEnv *, jobject, jlong, jlong, jint, jint);
+  (JNIEnv *, jclass, jlong, jlong, jint, jint);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
@@ -179,7 +179,7 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
  * Signature: (JJIBB)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetField
-  (JNIEnv *, jobject, jlong, jlong, jint, jbyte, jbyte);
+  (JNIEnv *, jclass, jlong, jlong, jint, jbyte, jbyte);
 
 #ifdef __cplusplus
 }

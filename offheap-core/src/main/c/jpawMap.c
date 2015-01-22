@@ -23,10 +23,18 @@ struct dataEntry {
 #endif
     // from here, the dataEntry is dumped to disk on saves.
     int uncompressedSize;       // size of the data, without this header portion
-    int compressedSize;         // 0 = is not compressed, otherwise size of the compressed output. The actual allocated space is rounded up such that the dataEntry size is always a multiple of 16
+    int compressedSize;         // for data: 0 = is not compressed, otherwise size of the compressed output. The actual allocated space is rounded up such that the dataEntry size is always a multiple of 16
     jlong key;
     char data[];
 };
+// the field compressedSize contains 0 or the compressed size (in byte) for data maps. For index maps,
+// it contains either the value (for byte, short, char, int; in this case uncompressed size is 0)
+// or a hashcode of the value (any other key type), in this case uncompressed size is the size of the data block which contains the serialized form of the key.
+
+// the hashCode (index of primary array) is for data maps the hash of the key, for index maps the hash of the index (modulus something)
+
+// in both cases, a key occurs once only, for every map.
+
 
 // overloaded methods
 struct fctnPtrs {
@@ -36,16 +44,16 @@ struct fctnPtrs {
 };
 
 struct map {
-    int mapType;            // dataMap, indexMap, unique flag, organization, has view
-    int count;              // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
+    int mapType;                    // dataMap, indexMap, unique flag, organization, has view
+    int count;                      // current number of entries. tracking this in Java gives a faster size() operation, but causes problems (callback required) for rollback
     int hashTableSize;
-    int hashTableSizeIndex;
-    int uniqueValues;       // used for unique index?
-    int modes;              // 00 = not transactional, -1 = take mode of transaction, 1 = TRANSACTIONAL
+    int hashTableSizeIndex;         // UNUSED
+    int uniqueValues;               // UNUSED used for unique index? (always 0 for key to data maps)
+    int modes;                      // 00 = not transactional, -1 = take mode of transaction, 1 = TRANSACTIONAL
     struct dataEntry **keyHash;
-    struct dataEntry *valueHash;      // used for index lookup
+    struct dataEntry *valueHash;    // used for index lookup: UNUSED!
     jlong lastCommittedRef;
-    struct map *committedView;  // same data, but synched after commit (to provide secondary view for read/only queries)
+    struct map *committedView;      // same data, but synched after commit (to provide secondary view for read/only queries, i.e. dirty read as well as committed read views...)
 };
 
 

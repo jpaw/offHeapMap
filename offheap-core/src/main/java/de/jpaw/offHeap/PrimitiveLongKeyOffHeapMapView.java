@@ -38,38 +38,38 @@ public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapVie
     //
   
     /** Register globals (especially the Iterator class). */
-    private native static void natInit(Class<?> arg);
+    private static native void natInit(Class<?> arg);
 
     /** Returns the number of entries in the JNI data structure. */
-    private native int natGetSize(long cMap);
+    private static native int natGetSize(long cMap);
     
     /** Returns the (uncompressed) size of the data stored for key, or -1 if null / no entry is stored for key. */
-    private native int natLength(long cMap, long key);
+    private static native int natLength(long cMap, long key);
     
     /** Returns the compressed size of a stored entry, or -1 if no entry is stored, or 0 if the data is not compressed. */
-    private native int natCompressedLength(long cMap, long key);
+    private static native int natCompressedLength(long cMap, long key);
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
-    private native byte [] natGet(long cMap, long key);
+    private static native byte [] natGet(long cMap, long key);
     
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
      * Chains of bigger length are not counted. The method returns the longest chain length. */
-    private native int natGetHistogram(long cMap, int [] chainsOfLength);
+    private static native int natGetHistogram(long cMap, int [] chainsOfLength);
     
     /** Copy an entry into a preallocated byte area, at a certain offset. */
-    private native int natGetIntoPreallocated(long cMap, long key, byte [] target, int offset);
+    private static native int natGetIntoPreallocated(long cMap, long key, byte [] target, int offset);
     
     /** Return a portion of a stored element, determined by offset and length.
      * The purpose of this method is to allow the transfer of a small portion of the data.
      * returns -1 if the entry did not exist, or the number of bytes transferred. */
-    private native byte [] natGetRegion(long cMap, long key, int offset, int length);
+    private static native byte [] natGetRegion(long cMap, long key, int offset, int length);
 
     /** Return a portion of a stored element, determined by field delimiters, excluding the delimiters.
      * Field numbering starts with 0. The first delimiter acts as a field separator, such as comma in CSV,
      * the second is an alternate delimiter, which indicates the following field should be interpreted as null.
      * (Normally, a field is considered as null only if the data ends before.) If the second delimiter is not desired,
      * assign it the same value as the first delimiter. */
-    private native byte [] natGetField(long cMap, long key, int fieldNo, byte delimiter, byte nullIndicator);
+    private static native byte [] natGetField(long cMap, long key, int fieldNo, byte delimiter, byte nullIndicator);
 
     //
     // External API, as a wrapper to the internal native one.

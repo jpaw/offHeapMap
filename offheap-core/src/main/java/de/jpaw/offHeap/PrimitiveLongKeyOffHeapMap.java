@@ -28,31 +28,31 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     
     /** Closes the map (clears the map and all entries it from memory).
      * After close() has been called, the object should not be used any more. */
-    private native void natClose(long cMap);
+    private static native void natClose(long cMap);
     
     /** Deletes all entries from the map, but keeps the map structure itself. */
-    private native void natClear(long cMap, long ctx);
+    private static native void natClear(long cMap, long ctx);
     
     /** Dump the full database contents to a disk file. */
-    private native void natWriteToFile(long cMap, byte [] pathname, boolean fromCommittedView);
+    private static native void natWriteToFile(long cMap, byte [] pathname, boolean fromCommittedView);
 
     /** Read a database from disk. The database should be empty before. */
-    private native void natReadFromFile(long cMap, byte [] pathname);
+    private static native void natReadFromFile(long cMap, byte [] pathname);
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
-    private native boolean natDelete(long cMap, long ctx, long key);
+    private static native boolean natDelete(long cMap, long ctx, long key);
     
     /** Read an entry and return it in uncompressed form, then deletes it from the structure.
      *  Returns null if no entry is present for the specified key. */
-    private native byte [] natRemove(long cMap, long ctx, long key);
+    private static native byte [] natRemove(long cMap, long ctx, long key);
     
     /** Stores an entry in the map. Returns true if this was a new entry. Returns false if the operation has overwritten existing data.
      * The new data will be compressed if indicated by the last parameter. data may not be null (use remove(key) for that purpose). */
-    private native boolean natSet(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
+    private static native boolean natSet(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     /** Stores an entry in the map and returns the previous entry, or null if there was no prior entry for this key.
      * data may not be null (use get(key) for that purpose). */
-    private native byte [] natPut(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
+    private static native byte [] natPut(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
     protected boolean shouldICompressThis(byte [] data) {
         return data.length > maxUncompressedSize;
