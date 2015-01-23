@@ -8,7 +8,7 @@
 #include "jpawMap.h"
 
 #define SEPARATE_COMMITTED_VIEW
-#define ADD_INDEX
+// #define ADD_INDEX  // not used differently...
 
 #undef DEBUG
 //#define DEBUG
@@ -28,13 +28,19 @@
 
 // transaction modes. bitwise ORed, they go into the modes field of current_transaction
 
-#define TRANSACTIONAL 0x01     // allow to rollback / safepoints
-#define REDOLOG_ASYNC 0x02     // allow replaying on a different database - fast
-#define REDOLOG_SYNC 0x04      // allow replaying on a different database - safe
-#define AS_PER_TRANSACTION (-1)   // no override in map
+#define TRANSACTIONAL       0x01    // allow to rollback / safepoints
+#define REDOLOG_ASYNC       0x02    // allow replaying on a different database - fast
+#define REDOLOG_SYNC        0x04    // allow replaying on a different database - safe
+#define IS_UNIQUE_UNDEX     0x10    // is an index AND it is unique
+#define IS_INDEX            0x20    // is an index
+#define INDEX_HASH_IS_KEY   0x40    // the index type is byte, short, char or int and is stored instead of an index. data size is 0
+
+#define VIEW_INDEX_MASK     0x70    // bits to keep on the committed view... these are the index settings.
+
+#define AS_PER_TRANSACTION  0x80    // no override in map
 
 
-#define IS_TRANSACTIONAL(ctx, mapdata)  ((ctx) && (mapdata)->modes != 0 && (ctx)->modes != 0)
+#define IS_TRANSACTIONAL(ctx, mapdata)  ((ctx) && ((mapdata)->modes & TRANSACTIONAL) != 0 && (ctx)->modes != 0)
 #define TX_LOG_ENTRIES_PER_CHUNK_LV1    1024        // first level blocks
 #define TX_LOG_ENTRIES_PER_CHUNK_LV2     256        // changes in final block
 

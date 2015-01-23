@@ -1,6 +1,5 @@
 package de.jpaw.offHeap;
 
-import java.io.PrintStream;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -14,23 +13,16 @@ import de.jpaw.collections.PrimitiveLongKeyMapView;
  * This class should be inherited in order to create specific implementations fir fixed types of V, while the native implementation is fixed to byte arrays.
  * 
  *  This implementation is not thread-safe. */
-public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapView<V> {
+public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> implements PrimitiveLongKeyMapView<V> {
     
     static {
         OffHeapInit.init();
         natInit(PrimitiveLongKeyOffHeapMapView.PrimitiveLongKeyOffHeapMapEntryIterator.class);
     }
     
-    /** Only used by native code, to store the off heap address of the structure. */
-    protected final ByteArrayConverter<V> converter;  // this is usually the superclass itself
-    protected final long cStruct;
-    protected final boolean isView;
-    
     // class can only be instantiated from a parent
     protected PrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView) {
-        this.converter = converter;
-        this.cStruct = cMap;
-        this.isView = isView;
+        super(converter, cMap, isView);
     }
     
     //
@@ -40,9 +32,6 @@ public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapVie
     /** Register globals (especially the Iterator class). */
     private static native void natInit(Class<?> arg);
 
-    /** Returns the number of entries in the JNI data structure. */
-    private static native int natGetSize(long cMap);
-    
     /** Returns the (uncompressed) size of the data stored for key, or -1 if null / no entry is stored for key. */
     private static native int natLength(long cMap, long key);
     
@@ -51,10 +40,6 @@ public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapVie
     
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
     private static native byte [] natGet(long cMap, long key);
-    
-    /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
-     * Chains of bigger length are not counted. The method returns the longest chain length. */
-    private static native int natGetHistogram(long cMap, int [] chainsOfLength);
     
     /** Copy an entry into a preallocated byte area, at a certain offset. */
     private static native int natGetIntoPreallocated(long cMap, long key, byte [] target, int offset);
@@ -76,24 +61,6 @@ public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapVie
     // The Java methods maintain the current size, in order to allow fast access to it from Java without the need to perform a JNI call.
     // Also, the decision when to compress an entry is done within Java for added flexibility (for example overwriting the decision method).
     //
-    
-
-    @Override
-    public boolean isReadonly() {
-        return isView;
-    }
-    
-    /** Returns the number of entries currently in the map. */
-    @Override
-    public int size() {
-        return natGetSize(cStruct);
-    }
-    
-    /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
-     * Chains of bigger length are not counted. The method returns the longest chain length. */
-    public int getHistogram(int [] chainsOfLength) {
-        return natGetHistogram(cStruct, chainsOfLength);
-    }
     
     /** Removes the entry stored for key from the map (if it did exist). */
     @Override
@@ -122,22 +89,6 @@ public class PrimitiveLongKeyOffHeapMapView<V> implements PrimitiveLongKeyMapVie
     @Override
     public V put(long key, V data) {
         throw new UnsupportedOperationException("Cannot delete on a readonly view");
-    }
-    
-    /** Prints the histogram of the hash distribution. */
-    public void printHistogram(int len, PrintStream out) {
-        if (out == null)
-            out = System.out;
-        int [] histogram = new int [len];
-        int maxChainLen = natGetHistogram(cStruct, histogram);
-        out.println("Currently " + size() + " entries are stored, with maximum chain length " + maxChainLen);
-        for (int i = 0; i < len; ++i)
-            out.println(String.format("%6d Chains of length %3d", histogram[i], i));
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return size() == 0;
     }
 
     /** Returns true if an entry is stored for key (i.e. get(key) would return non null), and false otherwise. */

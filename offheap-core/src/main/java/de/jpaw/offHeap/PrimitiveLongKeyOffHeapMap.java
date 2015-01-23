@@ -2,42 +2,20 @@ package de.jpaw.offHeap;
 
 import java.nio.charset.Charset;
 
+import de.jpaw.collections.ByteArrayConverter;
 import de.jpaw.collections.DatabaseIO;
 import de.jpaw.collections.PrimitiveLongKeyMap;
-import de.jpaw.collections.ByteArrayConverter;
-import de.jpaw.collections.PrimitiveLongKeyMapView;
 
 public class PrimitiveLongKeyOffHeapMap<V> extends PrimitiveLongKeyOffHeapMapView<V>
 implements PrimitiveLongKeyMap<V>, DatabaseIO {
     
-    private final Shard myShard;
+    protected final Shard myShard;
     
-    private final PrimitiveLongKeyOffHeapMapView<V> myView;
+    protected final PrimitiveLongKeyOffHeapMapView<V> myView;
     
     /** The threshold at which entries stored should be automatically compressed, in bytes.
      * Setting it to Integer.MAX_VALUE will disable compression. Setting it to 0 will perform compression for all (non-zero-length) items. */
     private int maxUncompressedSize = Integer.MAX_VALUE;
-    
-    /** Allocates and initializes a new data structure for the given maximum number of elements.
-     * Returns the resulting off heap location.
-     */
-    private static native long natOpen(int size, int modes, boolean withCommittedView);
-    
-    /** Returns the read-only shadow (committed view) of the map, or null if this map does not have a shadow. */
-    private static native long natGetView(long cMap);
-    
-    /** Closes the map (clears the map and all entries it from memory).
-     * After close() has been called, the object should not be used any more. */
-    private static native void natClose(long cMap);
-    
-    /** Deletes all entries from the map, but keeps the map structure itself. */
-    private static native void natClear(long cMap, long ctx);
-    
-    /** Dump the full database contents to a disk file. */
-    private static native void natWriteToFile(long cMap, byte [] pathname, boolean fromCommittedView);
-
-    /** Read a database from disk. The database should be empty before. */
-    private static native void natReadFromFile(long cMap, byte [] pathname);
     
     /** Removes an entry from the map. returns true if it was removed, false if no data was present. */
     private static native boolean natDelete(long cMap, long ctx, long key);
@@ -62,7 +40,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     
     // TODO: use the builder pattern here, the number of optional parameters is growing...
     protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
-        super(converter, natOpen(size, modes, withCommittedView), false);
+        super(converter, natOpen(size, modes, withCommittedView, 0L), false);
         myShard = forShard;
         myView = withCommittedView ? new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true) : null;
     }
@@ -185,7 +163,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     }
     
     @Override
-    public PrimitiveLongKeyMapView<V> getView() {
+    public PrimitiveLongKeyOffHeapMapView<V> getView() {
         return myView;
     }
 
