@@ -2,24 +2,29 @@ package de.jpaw.offHeap;
 
 import de.jpaw.collections.ByteArrayConverter;
 
-public class PrimitiveLongKeyOffHeapIndex<V,I> extends PrimitiveLongKeyOffHeapIndexView<V,I> {
-    protected final PrimitiveLongKeyOffHeapIndexView<V,I> myView;
+public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapIndexView<I> {
+    protected final PrimitiveLongKeyOffHeapIndexView<I> myView;
     
     protected final Shard myShard;
     
     // TODO: use the builder pattern here, the number of optional parameters is growing...
-    protected PrimitiveLongKeyOffHeapIndex(
-            PrimitiveLongKeyOffHeapMap<V> dataMap,
+    public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
-            int size,
-            int modes) {
+            int size, Shard forShard, int modes, boolean withCommittedView) {
         // construct the map index map
-        super(dataMap, natOpen(size, modes, dataMap.myView != null, dataMap.cStruct), false, indexConverter);
+        super(natOpen(size, modes, withCommittedView), false, indexConverter);
         
         // register at transaction for the same shard
-        myShard = dataMap.myShard;
-        myView = dataMap.myView != null ? new PrimitiveLongKeyOffHeapIndexView<V,I>(dataMap.getView(), natGetView(cStruct), true, indexConverter) : null;
+        myShard = forShard;
+        myView = withCommittedView ? new PrimitiveLongKeyOffHeapIndexView<I>(natGetView(cStruct), true, indexConverter) : null;
     }
+    
+    public PrimitiveLongKeyOffHeapIndex(
+            ByteArrayConverter<I> indexConverter,
+            int size, int modes) {
+        this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false);
+    }
+    
     
     /** Read an entry and return its key, or null if it does not exist. */
     private static native void natIndexCreate(long cMap, long ctx, long key, int indexHash, byte [] indexData);
@@ -90,7 +95,7 @@ public class PrimitiveLongKeyOffHeapIndex<V,I> extends PrimitiveLongKeyOffHeapIn
 //        cStruct = 0L;
     }
     
-    public PrimitiveLongKeyOffHeapIndexView<V,I> getView() {
+    public PrimitiveLongKeyOffHeapIndexView<I> getView() {
         return myView;
     }
 }

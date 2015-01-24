@@ -268,6 +268,14 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natGetSize
 
 /*
  * Class:     de_jpaw_offHeap_AbstractOffHeapMap
+ * Method:    natFullDump
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natFullDump
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractOffHeapMap
  * Method:    natGetHistogram
  * Signature: (J[I)I
  */
@@ -277,10 +285,10 @@ JNIEXPORT jint JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natGetHistogram
 /*
  * Class:     de_jpaw_offHeap_AbstractOffHeapMap
  * Method:    natOpen
- * Signature: (IIZJ)J
+ * Signature: (IIZ)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natOpen
-  (JNIEnv *, jclass, jint, jint, jboolean, jlong);
+  (JNIEnv *, jclass, jint, jint, jboolean);
 
 /*
  * Class:     de_jpaw_offHeap_AbstractOffHeapMap

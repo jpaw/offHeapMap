@@ -2,6 +2,7 @@ package de.jpaw.offHeap;
 
 import org.testng.annotations.Test;
 
+import de.jpaw.collections.ByteArrayConverter;
 import de.jpaw.collections.PrimitiveLongKeyMapView;
 
 @Test
@@ -23,10 +24,9 @@ public class ViewIndexTransactionTest {
         PrimitiveLongKeyMapView<String> myView = myMap.getView();
         
         // index
-        PrimitiveLongKeyOffHeapIndex<String, String> myIndex = new PrimitiveLongKeyOffHeapIndex<String, String>(
-                myMap, OffHeapIndexTest.STRING_CONVERTER, 1000, 0x31  // transactional unique view
-                );
-        PrimitiveLongKeyOffHeapIndexView<String,String> myIndexView = myIndex.getView();
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, s1, 0x31, true);  // transactional unique view
+        PrimitiveLongKeyOffHeapIndexView<String> myIndexView = myIndex.getView();
         
         myMap.set(1L, "The");
         myMap.set(2L, "next");

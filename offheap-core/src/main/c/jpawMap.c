@@ -53,7 +53,6 @@ struct map {
     int hashTableSize;
     int modes;                      // 00 = not transactional, 0x80 = take mode of transaction, 1 = TRANSACTIONAL.. see jpawTransaction.h
     struct dataEntry **keyHash;
-    struct map *dataMap;            // null for long to data maps, points to that for index maps (reverse maps)
     jlong lastCommittedRef;
     struct map *committedView;      // same data, but synched after commit (to provide secondary view for read/only queries, i.e. dirty read as well as committed read views...)
 };
@@ -188,6 +187,9 @@ static int record_change(JNIEnv *env, struct tx_log_hdr *ctx, struct map *mapdat
     loge->old_entry = oldData;
     loge->new_entry = newData;
     ++(ctx->number_of_changes);
+
+    if (!(ctx->number_of_changes & 0x3ff))
+        fprintf(stderr, "WARNING: Transaction has grown to %d changes...\n", ctx->number_of_changes);
     return 0;
 }
 
@@ -206,7 +208,7 @@ static int record_change(JNIEnv *env, struct tx_log_hdr *ctx, struct map *mapdat
  * Signature: (IIZ)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natOpen
-    (JNIEnv *env, jobject me, jint size, jint mode, jboolean withCommittedView, jlong dataCMap) {
+    (JNIEnv *env, jobject me, jint size, jint mode, jboolean withCommittedView) {
     // round up the size to multiples of 32, for the collision indicator
     size = ((size - 1) | 31) + 1;
     struct map *mapdata = malloc(sizeof(struct map));
@@ -214,12 +216,11 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natOpen
         throwOutOfMemory(env);
         return 0L;
     }
+    mapdata->mapType = MAP_TYPE_DATA_AND_VIEW;
+    mapdata->count = 0;
     mapdata->hashTableSize = size;
     mapdata->modes = mode;
-    mapdata->count = 0;
-    mapdata->mapType = MAP_TYPE_DATA_AND_VIEW;
     mapdata->lastCommittedRef = -1L;
-    mapdata->dataMap = (struct map *)dataCMap;
     mapdata->committedView = NULL;
     mapdata->keyHash = calloc(size, sizeof(struct dataEntry *));
     if (!mapdata->keyHash) {
@@ -266,7 +267,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natGetView
 
 static inline int computeHash(jlong arg) {
     arg *= 33;
-    return ((int) (arg ^ (arg >> 32)) & 0x7fffffff);
+    return (int) (arg ^ (arg >> 32));
 }
 
 static inline int computeKeyHash(jlong arg, int size) {
@@ -275,7 +276,7 @@ static inline int computeKeyHash(jlong arg, int size) {
 }
 
 static inline int computeSlot(const struct map * const mapdata, const struct dataEntry * const e) {
-    return (mapdata->modes & IS_INDEX ? e->compressedSize : computeHash(e->key)) % mapdata->hashTableSize;
+    return ((mapdata->modes & IS_INDEX ? e->compressedSize : computeHash(e->key)) & 0x7fffffff) % mapdata->hashTableSize;
 }
 
 // clear all entries
@@ -625,18 +626,19 @@ static struct dataEntry *create_new_entry(JNIEnv *env, jlong key, jbyteArray dat
 
 static struct dataEntry *create_new_index_entry(JNIEnv *env, jlong key, jint hash, jbyteArray data) {
     // int uncompressed_length = (*env)->GetArrayLength(env, data);
-    struct dataEntry *e;
     int length = data ? (*env)->GetArrayLength(env, data) : 0;
-    e = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
+    struct dataEntry *e = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
     if (!e)
         return NULL;  // will throw OOM
+
+    // populate the fields in order of occurence
+    e->nextSameHash = NULL;   // initialize temporarily!
+    e->nextInCommittedView = NULL;
+    e->uncompressedSize = length;
     e->compressedSize = hash;
+    e->key = key;
     if (length > 0)
         (*env)->GetByteArrayRegion(env, data, 0, length, (jbyte *)e->data);
-
-    e->uncompressedSize = length;
-    e->nextInCommittedView = NULL;
-    e->key = key;
     return e;
 }
 
@@ -1067,6 +1069,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natReadFromFile
             free(buffer);
             fclose(fp);
             throwOutOfMemory(env);
+            return;
         }
         e->key = entryHdr.key;
         e->uncompressedSize = entryHdr.uncompressedSize;
@@ -1163,7 +1166,7 @@ void rollback(struct tx_log_entry *e) {
 
 
 // find some existing entry or return null
-static struct dataEntry *findIndexEntry(struct dataEntry *e, int len, int newHash, void *data) {
+static struct dataEntry *findIndexEntry(struct dataEntry *e, int len, int newHash, const void *data) {
     while (e) {
         // check if this is a match (isSameIndex(e, newEntry)
         if (e->compressedSize == newHash && len == e->uncompressedSize) {
@@ -1177,21 +1180,22 @@ static struct dataEntry *findIndexEntry(struct dataEntry *e, int len, int newHas
     return NULL;
 }
 
-static struct dataEntry * setPutSubIndex(struct map *mapdata, struct dataEntry *newEntry) {
-    int slot = newEntry->compressedSize % mapdata->hashTableSize;
-    struct dataEntry *e = mapdata->keyHash[slot];
-    newEntry->nextSameHash = e;  // insert it at the start
+static struct dataEntry * setPutSubIndex(struct map * const mapdata, struct dataEntry * const newEntry) {
+    int slot = (newEntry->compressedSize & 0x7fffffff) % mapdata->hashTableSize;
+    struct dataEntry *existing = mapdata->keyHash[slot];
+    newEntry->nextSameHash = existing;  // insert it at the start
     mapdata->keyHash[slot] = newEntry;
 
     if (mapdata->modes & IS_UNIQUE_UNDEX) {
+//        fprintf(stderr, "try find existing: modes = %02x, hash size = %d, using slot %d\n", mapdata->modes, mapdata->hashTableSize, slot);
         // check for existing index of same value
-        struct dataEntry *existing = findIndexEntry(e, newEntry->uncompressedSize, newEntry->compressedSize, newEntry->data);
+        existing = findIndexEntry(existing, newEntry->uncompressedSize, newEntry->compressedSize, newEntry->data);
         if (existing)
             return existing;
     }
     // this is a new entry
 #ifdef DEBUG
-    fprintf(stderr, "Inserting an index entry of key %ld in slot %d\n", (long)key, hash);
+    fprintf(stderr, "Inserting an index entry of key %ld in slot %d\n", (long)key, slot);
 #endif
     ++mapdata->count;
     return NULL;
@@ -1201,8 +1205,8 @@ static struct dataEntry * setPutSubIndex(struct map *mapdata, struct dataEntry *
 // old slot and new slot could be different or the same!
 static struct dataEntry * setPutSubIndexReplace(struct map *mapdata, int oldHash, struct dataEntry *newEntry) {
     jlong key = newEntry->key;
-    int newSlot = newEntry->compressedSize % mapdata->hashTableSize;
-    int oldSlot = oldHash % mapdata->hashTableSize;
+    int newSlot = (newEntry->compressedSize & 0x7fffffff) % mapdata->hashTableSize;
+    int oldSlot = (oldHash  & 0x7fffffff) % mapdata->hashTableSize;
     struct dataEntry *e = mapdata->keyHash[newSlot];  // the new start of chain...
     struct dataEntry *f = mapdata->keyHash[oldSlot];  // the old start of chain..., to find the previous entry for key
 
@@ -1249,11 +1253,15 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
   (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint hash, jbyteArray data) {
     struct map *mapdata = (struct map *) cMap;
     struct dataEntry *newEntry = create_new_index_entry(env, key, hash, data);
-    if (!newEntry)
+    if (!newEntry) {
         throwOutOfMemory(env);
+        return;
+    }
 
-    if (setPutSubIndex(mapdata, newEntry))
+    if (setPutSubIndex(mapdata, newEntry)) {
         throwDuplicateKey(env);
+        return;
+    }
     record_change(env, (struct tx_log_hdr *)ctx, mapdata, 0, newEntry);  // may throw an error
 }
 
@@ -1265,7 +1273,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexDelete
   (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint hash) {
     struct map *mapdata = (struct map *) cMap;
-    int slot = hash % mapdata->hashTableSize;
+    int slot = (hash  & 0x7fffffff) % mapdata->hashTableSize;
 
     struct dataEntry *prev = NULL;
     struct dataEntry *e = mapdata->keyHash[slot];
@@ -1273,9 +1281,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
         // check if this is a match
         if (e->key == key) {
             // plausi check
-            if (e->compressedSize != hash)
+            if (e->compressedSize != hash) {
                 throwInconsistent(env, "hash code differs");
-
+                return;
+            }
             if (!prev) {
                 // initial entry, update mapdata
                 mapdata->keyHash[slot] = e->nextSameHash;
@@ -1301,8 +1310,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
   (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint oldHash, jint newHash, jbyteArray newData) {
     struct map *mapdata = (struct map *) cMap;
     struct dataEntry *newEntry = create_new_index_entry(env, key, newHash, newData);
-    if (!newEntry)
+    if (!newEntry) {
         throwOutOfMemory(env);
+        return;
+    }
 
     struct dataEntry *previousEntry = setPutSubIndexReplace(mapdata, oldHash, newEntry);
     if (!previousEntry) {
@@ -1311,6 +1322,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
             throwDuplicateKey(env);
         else
             throwInconsistent(env, "old index entry not found");
+        return;
     }
     record_change(env, (struct tx_log_hdr *)ctx, mapdata, previousEntry, newEntry);  // may throw an error
 }
@@ -1326,7 +1338,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_natIndexGetKey
   (JNIEnv *env, jclass me, jlong cMap, jint hash, jbyteArray data) {
     struct map *mapdata = (struct map *) cMap;
-    int slot = hash % mapdata->hashTableSize;
+    int slot = (hash  & 0x7fffffff) % mapdata->hashTableSize;
     struct dataEntry *e = mapdata->keyHash[slot];
     if (!e) {
         // no entry here, don't worry copying byte arrays...
@@ -1378,7 +1390,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_nat
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterateStart
   (JNIEnv *env, jobject myClass, jlong cMap, jint hash, jbyteArray data) {
     struct map *mapdata = (struct map *) cMap;
-    int slot = hash % mapdata->hashTableSize;
+    int slot = (hash & 0x7fffffff) % mapdata->hashTableSize;
 #ifdef DEBUG
     fprintf(stderr, "iterate on map index %16p (has %d entries in %d slots)\n", mapdata, mapdata->count, mapdata->hashTableSize);
 #endif
@@ -1431,4 +1443,24 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
     }
     // no further entry found. must be at end
     return (jlong)0;
+}
+
+/*
+ * Class:     de_jpaw_offHeap_AbstractOffHeapMap
+ * Method:    natFullDump
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_AbstractOffHeapMap_natFullDump
+  (JNIEnv *env, jclass me, jlong cMap) {
+    struct map *mapdata = (struct map *) cMap;
+
+    printf("Map is at %16p, hash size %d, %d entries, modes=%02x\n", mapdata, mapdata->hashTableSize, mapdata->count, mapdata->modes);
+    for (int i = 0; i < mapdata->hashTableSize; ++i) {
+        if (mapdata->keyHash[i]) {
+            printf("Slot %d:\n", i);
+            for (struct dataEntry *e = mapdata->keyHash[i]; e; e = e->nextSameHash) {
+                printf("    key %08lx: len=%9d hash=%08x\n", e->key, e->uncompressedSize, e->compressedSize);
+            }
+        }
+    }
 }

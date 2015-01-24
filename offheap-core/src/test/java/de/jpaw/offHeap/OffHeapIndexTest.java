@@ -1,7 +1,5 @@
 package de.jpaw.offHeap;
 
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 
 import org.testng.Assert;
@@ -10,28 +8,13 @@ import org.testng.annotations.Test;
 import de.jpaw.collections.ByteArrayConverter;
 import de.jpaw.collections.DuplicateIndexException;
 import de.jpaw.collections.InconsistentIndexException;
-import de.jpaw.collections.PrimitiveLongKeyMapView;
 
 public class OffHeapIndexTest {
-    static public Charset defCS = StandardCharsets.UTF_8;
-    static public final ByteArrayConverter<String> STRING_CONVERTER = new ByteArrayConverter<String>() {
-
-        @Override
-        public byte[] valueTypeToByteArray(String arg) {
-            return arg == null ? null : arg.getBytes(defCS);
-        }
-        @Override
-        public String byteArrayToValueType(byte[] arg) {
-            return arg == null ? null : new String(arg, defCS);
-        }
-    };
-    
     
     private void insertIndexes(int mode, String ... indexes) {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
-        PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex = new PrimitiveLongKeyOffHeapIndex<byte [], String>(
-                myMap, STRING_CONVERTER, 1000, mode
-                );
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, mode);
         long key = 123456789L;
         for (int i = 0; i < indexes.length; ++i)
             myIndex.create(++key, indexes[i]);
@@ -65,9 +48,8 @@ public class OffHeapIndexTest {
     @Test
     public void runCreateUpdateDeleteTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
-        PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex = new PrimitiveLongKeyOffHeapIndex<byte [], String>(
-                myMap, STRING_CONVERTER, 1000, 0x30
-                );
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
         
         myIndex.create(777L, "hello");
         myIndex.update(777L, "hello", "world");
@@ -83,9 +65,8 @@ public class OffHeapIndexTest {
     @Test(expectedExceptions = InconsistentIndexException.class)
     public void runCreateDeleteFailTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
-        PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex = new PrimitiveLongKeyOffHeapIndex<byte [], String>(
-                myMap, STRING_CONVERTER, 1000, 0x30
-                );
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
         
         myIndex.create(777L, "hello");
         myIndex.delete(777L, "world");
@@ -99,9 +80,8 @@ public class OffHeapIndexTest {
     @Test
     public void runCreateDeleteTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
-        PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex = new PrimitiveLongKeyOffHeapIndex<byte [], String>(
-                myMap, STRING_CONVERTER, 1000, 0x30
-                );
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
         
         myIndex.create(777L, "hello");
         myIndex.delete(777L, "hello");
@@ -115,9 +95,8 @@ public class OffHeapIndexTest {
     @Test
     public void runCreateReadTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
-        PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex = new PrimitiveLongKeyOffHeapIndex<byte [], String>(
-                myMap, STRING_CONVERTER, 1000, 0x30
-                );
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
         
         myIndex.create(777L, "hello");
         Long result1 = myIndex.getUniqueKeyByIndex("hello");
@@ -137,18 +116,17 @@ public class OffHeapIndexTest {
         myMap.close();
     }
     
-    private boolean checkAtLeastOneEntryUsingIterable(PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex, String index) {
-        Iterable<PrimitiveLongKeyMapView.Entry<byte[]>> tmp = myIndex.entriesForIndex(index);
-        Iterator<PrimitiveLongKeyMapView.Entry<byte[]>> tmp2 = tmp.iterator();
+    private boolean checkAtLeastOneEntryUsingIterable(PrimitiveLongKeyOffHeapIndex<String> myIndex, String index) {
+        Iterable<Long> tmp = myIndex.entriesForIndex(index);
+        Iterator<Long> tmp2 = tmp.iterator();
         return tmp2.hasNext();
     }
     
     @Test
     public void runMultiKeyIteratorTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
-        PrimitiveLongKeyOffHeapIndex<byte [], String> myIndex = new PrimitiveLongKeyOffHeapIndex<byte [], String>(
-                myMap, STRING_CONVERTER, 1000, 0x20
-                );
+        PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x20);
         
         myIndex.create(777L, "hello");
         myIndex.create(778L, "world");
@@ -158,17 +136,17 @@ public class OffHeapIndexTest {
         
         int cnt = 0;
         
-        Iterable<PrimitiveLongKeyMapView.Entry<byte[]>> tmp = myIndex.entriesForIndex("hello");
+        Iterable<Long> tmp = myIndex.entriesForIndex("hello");
         System.out.println("got an iterable");
-        Iterator<PrimitiveLongKeyMapView.Entry<byte[]>> tmp2 = tmp.iterator();
+        Iterator<Long> tmp2 = tmp.iterator();
         System.out.println("got an iterator");
         
         System.out.println("hasNext(\"hello\") is " + tmp2.hasNext());
         System.out.println("hasNext(\"none\") is " + checkAtLeastOneEntryUsingIterable(myIndex, "none"));
         System.out.println("hasNext(\"world\") is " + checkAtLeastOneEntryUsingIterable(myIndex, "world"));
         
-        for (PrimitiveLongKeyMapView.Entry<byte[]> e: myIndex.entriesForIndex("hello")) {
-            System.out.println(e.getKey());
+        for (Long e: myIndex.entriesForIndex("hello")) {
+            System.out.println(e);
             ++cnt;
         }
         Assert.assertEquals(cnt, 2);

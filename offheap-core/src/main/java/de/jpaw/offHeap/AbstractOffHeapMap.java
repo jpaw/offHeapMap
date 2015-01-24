@@ -25,6 +25,9 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
     /** Returns the number of entries in the JNI data structure. */
     private static native int natGetSize(long cMap);
     
+    /** Returns the number of entries in the JNI data structure. */
+    private static native void natFullDump(long cMap);
+    
     /** Returns a histogram of the hash distribution. For each entry in the array, the number of hash chains with this length is provided.
      * Chains of bigger length are not counted. The method returns the longest chain length. */
     private static native int natGetHistogram(long cMap, int [] chainsOfLength);
@@ -32,7 +35,7 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
     /** Allocates and initializes a new data structure for the given maximum number of elements.
      * Returns the resulting off heap location.
      */
-    protected static native long natOpen(int size, int modes, boolean withCommittedView, long dataCMap);
+    protected static native long natOpen(int size, int modes, boolean withCommittedView);
     
     /** Returns the read-only shadow (committed view) of the map, or null if this map does not have a shadow. */
     protected static native long natGetView(long cMap);
@@ -68,6 +71,15 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
         return natGetHistogram(cStruct, chainsOfLength);
     }
     
+    private static final int [] NO_ARRAY = new int [0];
+    public void verifyMaxChainLength(int maxLen) {
+        int actualMaxLen = natGetHistogram(cStruct, NO_ARRAY);
+        if (actualMaxLen > maxLen) {
+            System.err.println("Validation error: maxlen is " + actualMaxLen);
+            throw new RuntimeException(actualMaxLen + " > " + maxLen);
+        }
+    }
+    
     /** Prints the histogram of the hash distribution. */
     public void printHistogram(int len, PrintStream out) {
         if (out == null)
@@ -79,6 +91,11 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
             out.println(String.format("%6d Chains of length %3d", histogram[i], i));
     }
 
+    /** Prints the histogram of the hash distribution. */
+    public void fullDump() {
+        natFullDump(cStruct);
+    }
+    
     @Override
     public boolean isEmpty() {
         return size() == 0;

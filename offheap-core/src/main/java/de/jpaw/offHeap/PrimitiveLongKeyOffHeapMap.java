@@ -40,7 +40,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     
     // TODO: use the builder pattern here, the number of optional parameters is growing...
     protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
-        super(converter, natOpen(size, modes, withCommittedView, 0L), false);
+        super(converter, natOpen(size, modes, withCommittedView), false);
         myShard = forShard;
         myView = withCommittedView ? new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true) : null;
     }
