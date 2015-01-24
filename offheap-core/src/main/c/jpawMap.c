@@ -57,6 +57,7 @@ struct map {
 
 static jfieldID javaIteratorCurrentHashIndexFID;
 static jfieldID javaIteratorCurrentKeyFID;
+static jfieldID javaIndexIteratorCurrentKeyFID;
 
 
 
@@ -1282,6 +1283,11 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_na
     struct map *mapdata = (struct map *) cMap;
     int slot = hash % mapdata->hashTableSize;
     struct dataEntry *e = mapdata->keyHash[slot];
+    if (!e) {
+        // no entry here, don't worry copying byte arrays...
+        return (jlong)-1;
+    }
+
     int length = data ? (*env)->GetArrayLength(env, data) : 0;
 
     void *dataCopy = NULL;
@@ -1301,12 +1307,83 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_na
     return existing->key;
 }
 
+// Index Iterator
+
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView
- * Method:    natIndexGetValue
- * Signature: (JI[B)[B
+ * Method:    natInit
+ * Signature: (Ljava/lang/Class;)V
  */
-JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_natIndexGetValue
-    (JNIEnv *env, jclass me, jlong cMap, jint hash, jbyteArray data) {
-    return NULL;
+JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_natInit
+  (JNIEnv *env, jclass myClass, jclass iteratorClass) {
+
+    // Get the Field ID of the instance variables "number"
+    javaIndexIteratorCurrentKeyFID = (*env)->GetFieldID(env, iteratorClass, "currentKey", "J");
+    if (!javaIndexIteratorCurrentKeyFID) {
+        throwAny(env, "Invoking class must have a field long currentKey");
+        return;
+    }
+}
+
+/*
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_PrimitiveLongKeyOffHeapMapEntryIterator
+ * Method:    natIterateStart
+ * Signature: (JI[B)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterateStart
+  (JNIEnv *env, jobject myClass, jlong cMap, jint hash, jbyteArray data) {
+    struct map *mapdata = (struct map *) cMap;
+    int slot = hash % mapdata->hashTableSize;
+#ifdef DEBUG
+    fprintf(stderr, "iterate on map index %16p (has %d entries in %d slots)\n", mapdata, mapdata->count, mapdata->hashTableSize);
+#endif
+    struct dataEntry *e = mapdata->keyHash[slot];
+    if (!e) {
+        // no entry here, don't worry copying byte arrays...
+        return (jlong)0;
+    }
+
+    int length = data ? (*env)->GetArrayLength(env, data) : 0;
+
+    void *dataCopy = NULL;
+    if (length > 0) {
+        dataCopy = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
+        if (!dataCopy) {
+            throwOutOfMemory(env);
+            return (jlong)0;
+        }
+        (*env)->GetByteArrayRegion(env, data, 0, length, (jbyte *)dataCopy);
+    }
+    e = findIndexEntry(e, length, hash, dataCopy);
+    if (dataCopy)
+        free(dataCopy);
+    if (e)
+        (*env)->SetLongField(env, myClass, javaIndexIteratorCurrentKeyFID, e->key);
+    return (jlong)e;
+}
+
+/*
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_PrimitiveLongKeyOffHeapMapEntryIterator
+ * Method:    natIterate
+ * Signature: (JJ)J
+ */
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
+  (JNIEnv *env, jobject myClass, jlong nextEntryPtr) {
+
+    // this method is never called with nextEntryPtr == null
+    struct dataEntry *old = (struct dataEntry *)nextEntryPtr;
+    int len = old->uncompressedSize;
+    for (struct dataEntry *e = old->nextSameHash; e; e = e->nextSameHash) {
+        if (e->compressedSize == old->compressedSize && e->uncompressedSize == len) {
+            if (len == 0 || !memcmp(e->data, old->data, len)) {
+#ifdef DEBUG
+                fprintf(stderr, "Found another index entry with key %ld\n", (long)(e->key));
+#endif
+                (*env)->SetLongField(env, myClass, javaIndexIteratorCurrentKeyFID, e->key);
+                return (jlong)e;
+            }
+        }
+    }
+    // no further entry found. must be at end
+    return (jlong)0;
 }

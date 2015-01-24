@@ -129,7 +129,10 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     }
     
     
-    
+    // protected proxy for access from index class
+    protected PrimitiveLongKeyOffHeapMapEntry createEntry(long key) {
+        return new PrimitiveLongKeyOffHeapMapEntry(key);
+    }
     
     /** The Map.Entry is just a proxy to the real data (flyweight). The value is obtained from the backing store on demand.
      * An optimized version could store a direct pointer to the off-Heap data, avoiding the hash computation, or even cache the value
