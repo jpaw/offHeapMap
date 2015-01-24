@@ -25,6 +25,42 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false);
     }
     
+    public abstract static class Builder<I, T extends PrimitiveLongKeyOffHeapIndex<I>> {
+        protected final ByteArrayConverter<I> converter;
+        protected int hashSize = 4096;
+        protected int mode = 0xa1;
+        protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
+        protected boolean withCommittedView = false;
+        
+        public Builder(ByteArrayConverter<I> converter) {
+            this.converter = converter;
+        }
+        public Builder<I, T> setHashSize(int hashSize) {
+            this.hashSize = hashSize;
+            return this;
+        }
+        public Builder<I, T> setShard(Shard shard) {
+            this.shard = shard;
+            return this;
+        }
+        public Builder<I, T> setUnique(boolean unique) {
+            if (unique)
+                this.mode |= 0x10;
+            else
+                this.mode &= ~0x10;
+            return this;
+        }
+        public Builder<I, T> setAutonomous() {
+            this.mode &= ~0x81;
+            return this;
+        }
+        public Builder<I, T> addCommittedView() {
+            this.withCommittedView = true;
+            return this;
+        }
+        public abstract T build();
+    }
+    
     
     /** Read an entry and return its key, or null if it does not exist. */
     private static native void natIndexCreate(long cMap, long ctx, long key, int indexHash, byte [] indexData);

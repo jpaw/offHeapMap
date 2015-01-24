@@ -4,18 +4,6 @@ import de.jpaw.collections.ByteArrayConverter;
 
 public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte []> {
     
-    private static final ByteArrayConverter<byte []> myConverter = new ByteArrayConverter<byte []>() {
-        @Override
-        public byte[] valueTypeToByteArray(byte[] arg) {
-            return arg;
-        }
-
-        @Override
-        public byte[] byteArrayToValueType(byte[] arg) {
-            return arg;
-        }
-    };
-    
     protected LongToByteArrayOffHeapMap(ByteArrayConverter<byte[]> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
         super(converter, size, forShard, modes, withCommittedView);
     }
@@ -23,7 +11,7 @@ public class LongToByteArrayOffHeapMap extends PrimitiveLongKeyOffHeapMap<byte [
     public static class Builder extends PrimitiveLongKeyOffHeapMap.Builder<byte [], LongToByteArrayOffHeapMap> {
 
         public Builder() {
-            super(myConverter);
+            super(ByteArrayConverter.BYTE_CONVERTER);
         }
         @Override
         public LongToByteArrayOffHeapMap build() {

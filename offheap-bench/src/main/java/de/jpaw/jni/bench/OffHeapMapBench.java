@@ -158,6 +158,28 @@ import de.jpaw.offHeap.Shard;
 //d.j.j.b.OffHeapMapBench.sizeOpNoTx                     avgt        9     9.699 ±  0.220  ns/op
 //d.j.j.b.OffHeapMapBench.sizeOpWithTx                   avgt        9     9.973 ±  0.897  ns/op
 
+// after fix slot number (better than before)
+//Benchmark                                              Mode  Samples     Score    Error  Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                 avgt        9    11.809 ±  1.822  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                   avgt        9    11.675 ±  0.015  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                 avgt        9    22.630 ±  0.164  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp             avgt        9   377.118 ±  5.772  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                       avgt        9   182.482 ±  2.355  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp           avgt        9   129.696 ±  2.293  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                     avgt        9    94.702 ±  6.245  ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                avgt        9   131.165 ±  7.560  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp              avgt        9   209.817 ± 15.397  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                 avgt        9   101.206 ±  4.145  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx      avgt        9  1167.152 ±  7.655  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx    avgt        9   433.523 ±  3.354  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp           avgt        9   119.573 ±  2.848  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx             avgt        9    95.303 ±  1.637  ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                avgt        9   179.653 ±  3.150  ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx              avgt        9    87.661 ±  4.626  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                     avgt        9     9.446 ±  0.005  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                   avgt        9     9.445 ±  0.002  ns/op
+
+
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(value = Scope.Thread)
