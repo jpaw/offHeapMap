@@ -89,4 +89,8 @@ public class PrimitiveLongKeyOffHeapIndex<V,I> extends PrimitiveLongKeyOffHeapIn
         natClose(cStruct);
 //        cStruct = 0L;
     }
+    
+    public PrimitiveLongKeyOffHeapIndexView<V,I> getView() {
+        return myView;
+    }
 }

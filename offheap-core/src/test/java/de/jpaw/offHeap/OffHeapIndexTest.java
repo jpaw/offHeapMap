@@ -13,18 +13,16 @@ import de.jpaw.collections.InconsistentIndexException;
 import de.jpaw.collections.PrimitiveLongKeyMapView;
 
 public class OffHeapIndexTest {
-    static public final String TEXT = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet";
-    static public final long KEY = 437L;
     static public Charset defCS = StandardCharsets.UTF_8;
     static public final ByteArrayConverter<String> STRING_CONVERTER = new ByteArrayConverter<String>() {
 
         @Override
         public byte[] valueTypeToByteArray(String arg) {
-            return arg == null ? null : arg.getBytes();
+            return arg == null ? null : arg.getBytes(defCS);
         }
         @Override
         public String byteArrayToValueType(byte[] arg) {
-            return arg == null ? null : new String(arg);
+            return arg == null ? null : new String(arg, defCS);
         }
     };
     

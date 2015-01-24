@@ -48,7 +48,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     public abstract static class Builder<V, T extends PrimitiveLongKeyOffHeapMap<V>> {
         protected final ByteArrayConverter<V> converter;
         protected int hashSize = 4096;
-        protected int mode = -1;
+        protected int mode = 0x81;
         protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
         protected boolean withCommittedView = false;
         
