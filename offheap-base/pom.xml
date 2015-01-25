@@ -4,12 +4,12 @@
     <parent>
         <groupId>de.jpaw</groupId>
         <artifactId>jpaw-se-parent</artifactId>
-        <version>1.0.2-SNAPSHOT</version>
+        <version>1.0.1</version>
         <relativePath/>
     </parent>
 
     <artifactId>offheap-base</artifactId>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>0.1.1</version>
     <packaging>pom</packaging>
 
     <properties>
