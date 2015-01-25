@@ -400,10 +400,35 @@ static struct dataEntry *find_entry(struct map *mapdata, jlong key) {
  * Signature: (JJ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGet
-    (JNIEnv *env, jobject me, jlong cMap, jlong key) {
+    (JNIEnv *env, jclass me, jlong cMap, jlong key) {
     struct map *mapdata = (struct map *) cMap;
     struct dataEntry *e = find_entry(mapdata, key);
     return toJavaByteArray(env, e);
+}
+
+/*
+ * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
+ * Method:    natGetAsByteBuffer
+ * Signature: (JJ)Ljava/nio/ByteBuffer;
+ */
+JNIEXPORT jobject JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_natGetAsByteBuffer
+(JNIEnv *env, jclass me, jlong cMap, jlong key) {
+    struct map *mapdata = (struct map *) cMap;
+    struct dataEntry *e = find_entry(mapdata, key);
+    if (!e)
+        return NULL;
+    if (!e->compressedSize)
+        return (*env)->NewDirectByteBuffer(env, e->data, (jlong)e->uncompressedSize);
+    // TODO: How to signal to the ByteBuffer that this block should be released?
+    // should perform an on-heap allocation here, or set this one as "writable" to indicate it.
+    char *tmp = malloc(e->uncompressedSize);
+    if (!tmp) {
+        throwOutOfMemory(env);
+        return NULL;
+    }
+    LZ4_decompress_fast(e->data, tmp, e->uncompressedSize);
+    return (*env)->NewDirectByteBuffer(env, tmp, (jlong)e->uncompressedSize);
+//    free(tmp);
 }
 
 /*

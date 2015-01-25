@@ -1,5 +1,6 @@
 package de.jpaw.offHeap;
 
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -41,6 +42,9 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     /** Read an entry and return it in uncompressed form. Returns null if no entry is present for the specified key. */
     private static native byte [] natGet(long cMap, long key);
     
+    /** Read an entry and return it as a DirectByteBuffer which is created from JNI. This avoids a buffer copy. */
+    private static native ByteBuffer natGetAsByteBuffer(long cMap, long key);
+    
     /** Copy an entry into a preallocated byte area, at a certain offset. */
     private static native int natGetIntoPreallocated(long cMap, long key, byte [] target, int offset);
     
@@ -72,6 +76,11 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     @Override
     public V get(long key) {
         return converter.byteArrayToValueType(natGet(cStruct, key));
+    }
+    
+    /** returns the data as a DirectByteBuffer. */
+    public ByteBuffer getAsByteBuffer(long key) {
+        return natGetAsByteBuffer(cStruct, key);
     }
     
     /** Returns the length of a stored entry, or -1 if no entry is stored. */

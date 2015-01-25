@@ -14,6 +14,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     protected final PrimitiveLongKeyOffHeapMapView<V> myView;
     
     /** The threshold at which entries stored should be automatically compressed, in bytes.
+     * It can be changed on the fly, at any time, using it to compress only specific items.
      * Setting it to Integer.MAX_VALUE will disable compression. Setting it to 0 will perform compression for all (non-zero-length) items. */
     private int maxUncompressedSize = Integer.MAX_VALUE;
     
