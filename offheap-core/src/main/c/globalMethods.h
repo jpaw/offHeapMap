@@ -1,6 +1,9 @@
 // forwards...
 
 // in map
+
+void throwInconsistent(JNIEnv *env, char *msg);
+void throwDuplicateKey(JNIEnv *env);
 void throwOutOfMemory(JNIEnv *env);
 void throwAny(JNIEnv *env, char *msg);
 

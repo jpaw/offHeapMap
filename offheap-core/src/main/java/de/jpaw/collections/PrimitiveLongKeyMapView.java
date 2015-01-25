@@ -2,25 +2,12 @@ package de.jpaw.collections;
 
 import java.util.Iterator;
 
-public interface PrimitiveLongKeyMapView<V> extends Iterable<PrimitiveLongKeyMapView.Entry<V>> {
+public interface PrimitiveLongKeyMapView<V> extends OffHeapBaseMap, Iterable<PrimitiveLongKeyMapView.Entry<V>> {
     interface Entry<V> {
-        @Override
-        public boolean equals(Object o);
-        @Override
-        public int hashCode();
         public long getKey();
         public V getValue();
         public V setValue(V value);
     }
-
-    /** Returns true, if this is a readonly view, false if it is extended by a superclass which provides R/W functionality
-     * (i.e. Entry.setValue() is supported and Iterator.remove()).
-     */
-    public boolean isReadonly();
-    
-    public int size();
-
-    public boolean isEmpty();
 
     public boolean containsKey(long key);
 

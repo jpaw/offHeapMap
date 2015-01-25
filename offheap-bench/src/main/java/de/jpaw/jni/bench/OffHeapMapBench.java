@@ -114,6 +114,72 @@ import de.jpaw.offHeap.Shard;
 // remeasure insertDeleteCommitOp:
 //d.j.j.b.OffHeapMapBench.insertDeleteCommitOp            avgt        12      141.021        7.319    ns/op
 
+
+// JMH 1.4.1, after extracting AbstractOffHeapMap as common base class for Map and index operations
+//Benchmark                                              Mode  Samples     Score    Error  Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                 avgt        9    11.371 ±  0.115  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                   avgt        9    11.836 ±  0.063  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                 avgt        9    22.581 ±  0.589  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp             avgt        9   423.428 ± 96.114  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                       avgt        9   203.436 ± 51.551  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp           avgt        9   144.626 ± 28.105  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                     avgt        9    93.089 ±  3.006  ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                avgt        9   124.643 ±  3.373  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp              avgt        9   199.413 ± 11.701  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                 avgt        9   103.514 ±  2.428  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx      avgt        9  1176.587 ± 19.840  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx    avgt        9   455.874 ± 35.619  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp           avgt        9   119.052 ±  5.866  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx             avgt        9    96.309 ±  0.746  ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                avgt        9   192.829 ± 19.820  ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx              avgt        9    87.408 ±  2.324  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                     avgt        9     9.583 ±  0.095  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                   avgt        9     9.550 ±  0.069  ns/op
+
+
+//JMH 1.4.1, after generalizing slot lookup for index as well as data operations
+//Benchmark                                              Mode  Samples     Score    Error  Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                 avgt        9    11.511 ±  0.515  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                   avgt        9    12.150 ±  0.634  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                 avgt        9    23.995 ±  2.113  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp             avgt        9   384.578 ±  7.302  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                       avgt        9   187.406 ±  3.643  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp           avgt        9   135.781 ±  4.134  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                     avgt        9    93.304 ±  2.352  ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                avgt        9   131.790 ±  7.136  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp              avgt        9   202.463 ±  5.807  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                 avgt        9   105.377 ±  5.483  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx      avgt        9  1199.254 ± 26.832  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx    avgt        9   446.558 ±  6.286  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp           avgt        9   121.849 ±  4.748  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx             avgt        9   100.214 ±  5.004  ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                avgt        9   186.821 ±  5.184  ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx              avgt        9    89.403 ±  7.199  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                     avgt        9     9.699 ±  0.220  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                   avgt        9     9.973 ±  0.897  ns/op
+
+// after fix slot number (better than before)
+//Benchmark                                              Mode  Samples     Score    Error  Units
+//d.j.j.b.OffHeapMapBench.commitOpNoRows                 avgt        9    11.809 ±  1.822  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpNoTx                   avgt        9    11.675 ±  0.015  ns/op
+//d.j.j.b.OffHeapMapBench.deleteOpWithTx                 avgt        9    22.630 ±  0.164  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBCompressedOp             avgt        9   377.118 ±  5.772  ns/op
+//d.j.j.b.OffHeapMapBench.get1KBOp                       avgt        9   182.482 ±  2.355  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallCompressedOp           avgt        9   129.696 ±  2.293  ns/op
+//d.j.j.b.OffHeapMapBench.getSmallOp                     avgt        9    94.702 ±  6.245  ns/op
+//d.j.j.b.OffHeapMapBench.insert1KBOpNoTx                avgt        9   131.165 ±  7.560  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitGetOp              avgt        9   209.817 ± 15.397  ns/op
+//d.j.j.b.OffHeapMapBench.insertCommitOp                 avgt        9   101.206 ±  4.145  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressed1KBOpNoTx      avgt        9  1167.152 ±  7.655  ns/op
+//d.j.j.b.OffHeapMapBench.insertCompressedSmallOpNoTx    avgt        9   433.523 ±  3.354  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteCommitOp           avgt        9   119.573 ±  2.848  ns/op
+//d.j.j.b.OffHeapMapBench.insertDeleteOpNoTx             avgt        9    95.303 ±  1.637  ns/op
+//d.j.j.b.OffHeapMapBench.insertGetOpNoTx                avgt        9   179.653 ±  3.150  ns/op
+//d.j.j.b.OffHeapMapBench.insertSmallOpNoTx              avgt        9    87.661 ±  4.626  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpNoTx                     avgt        9     9.446 ±  0.005  ns/op
+//d.j.j.b.OffHeapMapBench.sizeOpWithTx                   avgt        9     9.445 ±  0.002  ns/op
+
+
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(value = Scope.Thread)

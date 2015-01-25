@@ -61,7 +61,7 @@ public class OffHeapMapTest {
         
         int compressedLen = myMap.compressedLength(KEY);
         assert(compressedLen < len);  // well, given this text, it should be! This is not valid for any input data, though
-        System.out.println("Original length = " + len + ", compressed length = " + compressedLen + ", ratio = " + (100.0 * (float)compressedLen / (float)len));
+        System.out.println("Original length = " + len + ", compressed length = " + compressedLen + ", ratio = " + (100.0 * compressedLen / len));
         
         myMap.close();
     }
@@ -84,7 +84,7 @@ public class OffHeapMapTest {
         
         int compressedLen = myMap.compressedLength(KEY);
         assert(compressedLen < len);  // well, given this text, it should be! This is not valid for any input data, though
-        System.out.println("Original length = " + len + ", compressed length = " + compressedLen + ", ratio = " + (100.0 * (float)compressedLen / (float)len));
+        System.out.println("Original length = " + len + ", compressed length = " + compressedLen + ", ratio = " + (100.0 * compressedLen / len));
         
         myMap.close();
     }
@@ -102,11 +102,11 @@ public class OffHeapMapTest {
         for (int i = 0; i < MAX_ENTRIES; ++i) {
             byte [] data = (TEXT + i).getBytes();
             myMem.add(data);
-            myMap.set((long)i, data);
+            myMap.set(i, data);
         }
         // retrieve and compare them
         for (int i = 0; i < MAX_ENTRIES; ++i) {
-            byte [] data = myMap.get((long)i);
+            byte [] data = myMap.get(i);
             assert(Arrays.equals(data, myMem.get(i)));
         }
         System.out.println("Compare test successful");
