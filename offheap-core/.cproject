@@ -24,9 +24,9 @@
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.14597018" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.1780285540" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
-								<option id="gnu.c.compiler.option.include.paths.1324553346" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/usr/java/jdk1.8.0_05/include"/>
-									<listOptionValue builtIn="false" value="/usr/java/jdk1.8.0_05/include/linux"/>
+								<option id="gnu.c.compiler.option.include.paths.1324553346" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/usr/java/jdk1.8.0_31/include"/>
+									<listOptionValue builtIn="false" value="/usr/java/jdk1.8.0_31/include/linux"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1727973050" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>

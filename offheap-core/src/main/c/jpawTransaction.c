@@ -1,4 +1,5 @@
 #include "jpawTransaction.h"
+#include "globalDefs.h"
 #include "globalMethods.h"
 
 

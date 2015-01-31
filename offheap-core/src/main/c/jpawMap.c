@@ -1,4 +1,5 @@
-#include "jpawTransaction.h"
+#include "jpawMap.h"
+#include "globalDefs.h"
 #include "globalMethods.h"
 
 #define USE_CRITICAL_FOR_STORE

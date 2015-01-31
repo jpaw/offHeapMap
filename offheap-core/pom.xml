@@ -58,6 +58,14 @@
                                  -->
                                 <exec executable="javah" >
                                     <arg value="-o" />
+                                    <arg value="${project.basedir}/src/main/c/jpawTransaction.h" />
+                                    <arg value="-classpath" />
+                                    <arg value="${project.build.outputDirectory}" />
+                                    <arg value="-force" />
+                                    <arg value="de.jpaw.offHeap.OffHeapTransaction" />
+                                </exec>
+                                <exec executable="javah" >
+                                    <arg value="-o" />
                                     <arg value="${project.basedir}/src/main/c/jpawMap.h" />
                                     <arg value="-classpath" />
                                     <arg value="${project.build.outputDirectory}" />
@@ -67,7 +75,6 @@
                                     <arg value="de.jpaw.offHeap.PrimitiveLongKeyOffHeapIndex" />
                                     <arg value="de.jpaw.offHeap.PrimitiveLongKeyOffHeapIndexView" />
                                     <arg value="de.jpaw.offHeap.AbstractOffHeapMap" />
-                                    <arg value="de.jpaw.offHeap.OffHeapTransaction" />
                                 </exec>
 
                                 <exec executable="make" ></exec>
