@@ -650,9 +650,8 @@ static struct dataEntry *create_new_entry(JNIEnv *env, jlong key, jbyteArray dat
     return e;
 }
 
-static struct dataEntry *create_new_index_entry(JNIEnv *env, jlong key, jint hash, jbyteArray data) {
+static struct dataEntry *create_new_index_entry(JNIEnv *env, jlong key, jint hash, jbyteArray data, jint length) {
     // int uncompressed_length = (*env)->GetArrayLength(env, data);
-    int length = data ? (*env)->GetArrayLength(env, data) : 0;
     struct dataEntry *e = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
     if (!e)
         return NULL;  // will throw OOM
@@ -1276,9 +1275,9 @@ static struct dataEntry * setPutSubIndexReplace(struct map *mapdata, int oldHash
  * Signature: (JJJI[B)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexCreate
-  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint hash, jbyteArray data) {
+  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint hash, jbyteArray data, jint length) {
     struct map *mapdata = (struct map *) cMap;
-    struct dataEntry *newEntry = create_new_index_entry(env, key, hash, data);
+    struct dataEntry *newEntry = create_new_index_entry(env, key, hash, data, length);
     if (!newEntry) {
         throwOutOfMemory(env);
         return;
@@ -1333,9 +1332,9 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
  * Signature: (JJJII[B)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexUpdate
-  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint oldHash, jint newHash, jbyteArray newData) {
+  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint oldHash, jint newHash, jbyteArray newData, jint length) {
     struct map *mapdata = (struct map *) cMap;
-    struct dataEntry *newEntry = create_new_index_entry(env, key, newHash, newData);
+    struct dataEntry *newEntry = create_new_index_entry(env, key, newHash, newData, length);
     if (!newEntry) {
         throwOutOfMemory(env);
         return;
@@ -1362,23 +1361,21 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
 * Signature: (JI[B)J
   */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_natIndexGetKey
-  (JNIEnv *env, jclass me, jlong cMap, jint hash, jbyteArray data) {
+  (JNIEnv *env, jclass me, jlong cMap, jint hash, jbyteArray data, jint length) {
     struct map *mapdata = (struct map *) cMap;
     int slot = (hash  & 0x7fffffff) % mapdata->hashTableSize;
     struct dataEntry *e = mapdata->keyHash[slot];
     if (!e) {
         // no entry here, don't worry copying byte arrays...
-        return (jlong)-1;
+        return (jlong)0;
     }
-
-    int length = data ? (*env)->GetArrayLength(env, data) : 0;
 
     void *dataCopy = NULL;
     if (length > 0) {
         dataCopy = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
         if (!dataCopy) {
             throwOutOfMemory(env);
-            return (jlong)-1;
+            return (jlong)0;
         }
         (*env)->GetByteArrayRegion(env, data, 0, length, (jbyte *)dataCopy);
     }
@@ -1386,7 +1383,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_na
     if (dataCopy)
         free(dataCopy);
     if (!existing)
-        return (jlong)-1;
+        return (jlong)0;
     return existing->key;
 }
 
@@ -1413,8 +1410,8 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_nat
  * Method:    natIterateStart
  * Signature: (JI[B)J
  */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterateStart
-  (JNIEnv *env, jobject myClass, jlong cMap, jint hash, jbyteArray data) {
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapViewIterator_natIterateStart
+  (JNIEnv *env, jobject myClass, jlong cMap, jint hash, jbyteArray data, jint length) {
     struct map *mapdata = (struct map *) cMap;
     int slot = (hash & 0x7fffffff) % mapdata->hashTableSize;
 #ifdef DEBUG
@@ -1425,8 +1422,6 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
         // no entry here, don't worry copying byte arrays...
         return (jlong)0;
     }
-
-    int length = data ? (*env)->GetArrayLength(env, data) : 0;
 
     void *dataCopy = NULL;
     if (length > 0) {
@@ -1450,7 +1445,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
  * Method:    natIterate
  * Signature: (JJ)J
  */
-JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
+JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapViewIterator_natIterate
   (JNIEnv *env, jobject myClass, jlong nextEntryPtr) {
 
     // this method is never called with nextEntryPtr == null

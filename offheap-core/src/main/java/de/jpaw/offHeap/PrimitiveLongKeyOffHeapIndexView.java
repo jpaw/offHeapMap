@@ -10,7 +10,7 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
     
     static {
         OffHeapInit.init();
-        natInit(PrimitiveLongKeyOffHeapIndexView.PrimitiveLongKeyOffHeapMapEntryIterator.class);
+        natInit(PrimitiveLongKeyOffHeapIndexView.PrimitiveLongKeyOffHeapViewIterator.class);
     }
     
     // class can only be instantiated from a parent
@@ -21,9 +21,9 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
         super(indexConverter, cMap, isView);
     }
 
-    protected byte [] indexData(I index) {
-        return converter == null ? null : converter.valueTypeToByteArray(index);
-    }
+//    protected byte [] indexData(I index) {
+//        return converter == null ? null : converter.valueTypeToByteArray(index);
+//    }
     
     protected int indexHash(I index) {
         return converter == null ? (Integer)index : index.hashCode();
@@ -33,19 +33,18 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
     private static native void natInit(Class<?> arg);
 
     /** Read an entry and return its key, or null if it does not exist. */
-    private static native long natIndexGetKey(long cMap, int indexHash, byte [] indexData);
+    private static native long natIndexGetKey(long cMap, int indexHash, byte [] indexData, int length);
     
     
-    /** returns the key for an index or null if there is no entry for this key.
+    /** returns the key for an index or 0 if there is no entry for this key.
      * TODO: throws dup_val_on_index if there is no unique key. */
-    public Long getUniqueKeyByIndex(I index) {
-        long l = natIndexGetKey(cStruct, indexHash(index), indexData(index));
-        return l == -1L ? null : Long.valueOf(l);
+    public long getUniqueKeyByIndex(I index) {
+        byte [] indexData = converter.getBuffer(index);
+        return natIndexGetKey(cStruct, indexHash(index), indexData, converter.getLength());
     }
     
     public Long getUniqueKeyByIndexDirect(int index) {
-        long l = natIndexGetKey(cStruct, index, null);
-        return l == -1L ? null : Long.valueOf(l);
+        return natIndexGetKey(cStruct, index, null, 0);
     }
     
     private class IndexIterable implements Iterable<Long> {
@@ -55,7 +54,7 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
         }
         @Override
         public Iterator<Long> iterator() {
-            return new PrimitiveLongKeyOffHeapMapEntryIterator(indexHash(index), indexData(index));
+            return new PrimitiveLongKeyOffHeapViewIterator(index);
         }
     }
     
@@ -65,28 +64,40 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
     
     // iterator for nonunique keys, to get all entries.
     // direct call, avoids the temporary object creation of the Iterable
-    public Iterator<Long> iterator(I index) {
-        return new PrimitiveLongKeyOffHeapMapEntryIterator(indexHash(index), indexData(index));
+    public PrimitiveLongKeyOffHeapViewIterator iterator(I index) {
+        return new PrimitiveLongKeyOffHeapViewIterator(index);
     }
     
-    private class PrimitiveLongKeyOffHeapMapEntryIterator implements Iterator<Long> {
-        private Long currentEntry = null;
-        
+    public class PrimitiveLongKeyOffHeapViewIterator implements Iterator<Long> {
         private long nextEntryPtr = 0L;     // we are "at End" if this field has value 0
         private long currentKey = 0L;       // updated from JNI
         
-        private native long natIterateStart(long cStructOfMap, int hash, byte [] data);
+        private native long natIterateStart(long cStructOfMap, int hash, byte [] data, int length);
         private native long natIterate(long previousEntryPtr);
         
         /** Constructor, protected because it can only be created by the Map itself. */
-        protected PrimitiveLongKeyOffHeapMapEntryIterator(int hash, byte [] data) {
-            nextEntryPtr = natIterateStart(cStruct, hash, data);   // true = isInitial
+        private PrimitiveLongKeyOffHeapViewIterator(I index) {
+            if (converter == null) {
+                nextEntryPtr = natIterateStart(cStruct, indexHash(index), null, 0);
+            } else {
+                byte [] data = converter.getBuffer(index); 
+                nextEntryPtr = natIterateStart(cStruct, indexHash(index), data, converter.getLength());
+            }
         }
         
-        public Long getCurrent() {
-            if (currentEntry == null)
+        public long getCurrent() {
+            if (currentKey <= 0L)
                 throw new NoSuchElementException();
-            return currentEntry;
+            return currentKey;
+        }
+        
+
+        public long nextAsPrimitiveLong() {
+            if (nextEntryPtr == 0L)
+                throw new NoSuchElementException();
+            long thisKey = currentKey;                  // currentKey will be modified during the JNI call
+            nextEntryPtr = natIterate(nextEntryPtr);    // peek to the one after this (to allow removing the returned one)
+            return thisKey;
         }
         
         @Override
@@ -98,9 +109,9 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
         public Long next() {
             if (nextEntryPtr == 0L)
                 throw new NoSuchElementException();
-            currentEntry = Long.valueOf(currentKey);
-            nextEntryPtr = natIterate(nextEntryPtr);   // peek to the one after this (to allow removing the returned one)
-            return currentEntry;
+            long thisKey = currentKey;                  // currentKey will be modified during the JNI call
+            nextEntryPtr = natIterate(nextEntryPtr);    // peek to the one after this (to allow removing the returned one)
+            return Long.valueOf(thisKey);
         }
         
         @Override

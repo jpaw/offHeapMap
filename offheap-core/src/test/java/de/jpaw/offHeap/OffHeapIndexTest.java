@@ -99,16 +99,16 @@ public class OffHeapIndexTest {
                 ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
         
         myIndex.create(777L, "hello");
-        Long result1 = myIndex.getUniqueKeyByIndex("hello");
+        long result1 = myIndex.getUniqueKeyByIndex("hello");
         Assert.assertNotNull(result1);
-        Assert.assertEquals(result1.longValue(), 777L);
+        Assert.assertEquals(result1, 777L);
         
-        Long result2 = myIndex.getUniqueKeyByIndex("world");
-        Assert.assertNull(result2);
+        long result2 = myIndex.getUniqueKeyByIndex("world");
+        Assert.assertEquals(result2, 0);
         
         myIndex.delete(777L, "hello");
-        Long result3 = myIndex.getUniqueKeyByIndex("hello");
-        Assert.assertNull(result3);
+        long result3 = myIndex.getUniqueKeyByIndex("hello");
+        Assert.assertEquals(result3, 0);
         
         Assert.assertEquals(myIndex.size(), 0);
         

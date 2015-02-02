@@ -33,10 +33,6 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
      * data may not be null (use get(key) for that purpose). */
     private static native byte [] natPut(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
-    protected boolean shouldICompressThis(byte [] data) {
-        return data.length > maxUncompressedSize;
-    }
-
 
     
     // TODO: use the builder pattern here, the number of optional parameters is growing...
@@ -124,8 +120,9 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         if (data == null) {
             delete(key);
         } else {
-            byte [] arr = converter.valueTypeToByteArray(data);
-            natSet(cStruct, myShard.getTxCStruct(), key, arr, 0, arr.length, shouldICompressThis(arr));
+            byte [] arr = converter.getBuffer(data);
+            int len = converter.getLength();
+            natSet(cStruct, myShard.getTxCStruct(), key, arr, 0, len, len > maxUncompressedSize);
         }
     }
     
@@ -136,8 +133,9 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         if (data == null) {
             return converter.byteArrayToValueType(natRemove(cStruct, myShard.getTxCStruct(), key));
         } else {
-            byte [] arr = converter.valueTypeToByteArray(data);
-            return converter.byteArrayToValueType(natPut(cStruct, myShard.getTxCStruct(), key, arr, 0, arr.length, shouldICompressThis(arr)));
+            byte [] arr = converter.getBuffer(data);
+            int len = converter.getLength();
+            return converter.byteArrayToValueType(natPut(cStruct, myShard.getTxCStruct(), key, arr, 0, len, len > maxUncompressedSize));
         }
     }
     
@@ -147,7 +145,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     public void setFromBuffer(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
+        natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, length > maxUncompressedSize);
     }
 
 
