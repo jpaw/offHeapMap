@@ -4,8 +4,8 @@ import de.jpaw.collections.ByteArrayConverter;
 
 public class IndexLong extends PrimitiveLongKeyOffHeapIndex<Long> {
     
-    protected IndexLong(ByteArrayConverter<Long> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
-        super(converter, size, forShard, modes, withCommittedView);
+    protected IndexLong(ByteArrayConverter<Long> converter, int size, Shard forShard, int modes, boolean withCommittedView, String name) {
+        super(converter, size, forShard, modes, withCommittedView, name);
     }
 
     public static class Builder extends PrimitiveLongKeyOffHeapIndex.Builder<Long, IndexLong> {
@@ -15,7 +15,7 @@ public class IndexLong extends PrimitiveLongKeyOffHeapIndex<Long> {
         }
         @Override
         public IndexLong build() {
-            return new IndexLong(converter, hashSize, shard, mode, withCommittedView);
+            return new IndexLong(converter, hashSize, shard, mode, withCommittedView, name);
         }
     }
     

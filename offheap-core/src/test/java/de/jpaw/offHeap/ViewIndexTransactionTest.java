@@ -26,7 +26,7 @@ public class ViewIndexTransactionTest {
         
         // index
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, s1, 0x31, true);  // transactional unique view
+                ByteArrayConverter.STRING_CONVERTER, 1000, s1, 0x31, true, "testIdx");  // transactional unique view
         PrimitiveLongKeyOffHeapIndexView<String> myIndexView = myIndex.getView();
         
         myMap.set(1L, "The");

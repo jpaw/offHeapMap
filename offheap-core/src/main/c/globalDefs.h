@@ -45,6 +45,10 @@
 #define TX_LOG_ENTRIES_PER_CHUNK_LV2     256        // changes in final block
 
 
+#define NO_ENTRY_PRESENT            (jlong)0        // value to return of no key exists for an index, but a primitive type is returned (null replacement)
+// candidates are Long.MIN, -1 and 0        choosing 0 for minimizing error (with the back side of detecting problems possibly late) and small / natural serialized form
+
+
 // stores a single modification of the maps.
 // the relevant types are insert / update / remove.
 // The type can be determined by which ptr is null and which not.

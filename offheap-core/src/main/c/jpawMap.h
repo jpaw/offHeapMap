@@ -223,10 +223,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_nat
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView
  * Method:    natIndexGetKey
- * Signature: (JI[BI)J
+ * Signature: (JI[BII)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_natIndexGetKey
-  (JNIEnv *, jclass, jlong, jint, jbyteArray, jint);
+  (JNIEnv *, jclass, jlong, jint, jbyteArray, jint, jint);
 
 #ifdef __cplusplus
 }

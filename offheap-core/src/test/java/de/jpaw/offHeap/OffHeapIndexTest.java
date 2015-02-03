@@ -14,7 +14,7 @@ public class OffHeapIndexTest {
     private void insertIndexes(int mode, String ... indexes) {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, mode);
+                ByteArrayConverter.STRING_CONVERTER, 1000, mode, "testIdx");
         long key = 123456789L;
         for (int i = 0; i < indexes.length; ++i)
             myIndex.create(++key, indexes[i]);
@@ -49,7 +49,7 @@ public class OffHeapIndexTest {
     public void runCreateUpdateDeleteTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30, "testIdx");
         
         myIndex.create(777L, "hello");
         myIndex.update(777L, "hello", "world");
@@ -66,7 +66,7 @@ public class OffHeapIndexTest {
     public void runCreateDeleteFailTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30, "testIdx");
         
         myIndex.create(777L, "hello");
         myIndex.delete(777L, "world");
@@ -81,7 +81,7 @@ public class OffHeapIndexTest {
     public void runCreateDeleteTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30, "testIdx");
         
         myIndex.create(777L, "hello");
         myIndex.delete(777L, "hello");
@@ -96,7 +96,7 @@ public class OffHeapIndexTest {
     public void runCreateReadTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30);
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x30, "testIdx");
         
         myIndex.create(777L, "hello");
         long result1 = myIndex.getUniqueKeyByIndex("hello");
@@ -126,7 +126,7 @@ public class OffHeapIndexTest {
     public void runMultiKeyIteratorTest() {
         LongToByteArrayOffHeapMap myMap = LongToByteArrayOffHeapMap.forHashSize(1000);
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, 0x20);
+                ByteArrayConverter.STRING_CONVERTER, 1000, 0x20, "testIdx");
         
         myIndex.create(777L, "hello");
         myIndex.create(778L, "world");

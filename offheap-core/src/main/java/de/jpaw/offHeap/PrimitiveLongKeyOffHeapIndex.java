@@ -10,19 +10,19 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
     // TODO: use the builder pattern here, the number of optional parameters is growing...
     public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
-            int size, Shard forShard, int modes, boolean withCommittedView) {
+            int size, Shard forShard, int modes, boolean withCommittedView, String name) {
         // construct the map index map
-        super(natOpen(size, modes, withCommittedView), false, indexConverter);
+        super(natOpen(size, modes, withCommittedView), false, indexConverter, name);
         
         // register at transaction for the same shard
         myShard = forShard;
-        myView = withCommittedView ? new PrimitiveLongKeyOffHeapIndexView<I>(natGetView(cStruct), true, indexConverter) : null;
+        myView = withCommittedView ? new PrimitiveLongKeyOffHeapIndexView<I>(natGetView(cStruct), true, indexConverter, name) : null;
     }
     
     public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
-            int size, int modes) {
-        this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false);
+            int size, int modes, String name) {
+        this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false, name);
     }
     
     public abstract static class Builder<I, T extends PrimitiveLongKeyOffHeapIndex<I>> {
@@ -31,6 +31,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         protected int mode = 0xa1;
         protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
         protected boolean withCommittedView = false;
+        protected String name = null;
         
         public Builder(ByteArrayConverter<I> converter) {
             this.converter = converter;
@@ -56,6 +57,10 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         }
         public Builder<I, T> addCommittedView() {
             this.withCommittedView = true;
+            return this;
+        }
+        public Builder<I, T> setName(String name) {
+            this.name = name;
             return this;
         }
         public abstract T build();

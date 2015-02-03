@@ -22,8 +22,8 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     }
     
     // class can only be instantiated from a parent
-    protected PrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView) {
-        super(converter, cMap, isView);
+    protected PrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView, String name) {
+        super(converter, cMap, isView, name);
     }
     
     //

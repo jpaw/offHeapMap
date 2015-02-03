@@ -17,8 +17,9 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
     protected PrimitiveLongKeyOffHeapIndexView(
             long cMap,
             boolean isView,
-            ByteArrayConverter<I> indexConverter) {
-        super(indexConverter, cMap, isView);
+            ByteArrayConverter<I> indexConverter,
+            String name) {
+        super(indexConverter, cMap, isView, name);
     }
 
 //    protected byte [] indexData(I index) {
@@ -33,18 +34,23 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
     private static native void natInit(Class<?> arg);
 
     /** Read an entry and return its key, or null if it does not exist. */
-    private static native long natIndexGetKey(long cMap, int indexHash, byte [] indexData, int length);
+    private static native long natIndexGetKey(long cMap, int indexHash, byte [] indexData, int offset, int length);
     
     
     /** returns the key for an index or 0 if there is no entry for this key.
      * TODO: throws dup_val_on_index if there is no unique key. */
     public long getUniqueKeyByIndex(I index) {
         byte [] indexData = converter.getBuffer(index);
-        return natIndexGetKey(cStruct, indexHash(index), indexData, converter.getLength());
+        return natIndexGetKey(cStruct, indexHash(index), indexData, 0, converter.getLength());
     }
     
-    public Long getUniqueKeyByIndexDirect(int index) {
-        return natIndexGetKey(cStruct, index, null, 0);
+    /** Returns the key for a given index entry, low level access method. */
+    public long getUniqueKeyByIndex(byte [] indexData, int offset, int length, int hash) {
+        return natIndexGetKey(cStruct, hash, indexData, offset, length);
+    }
+    
+    public long getUniqueKeyByIndexDirect(int index) {
+        return natIndexGetKey(cStruct, index, null, 0, 0);
     }
     
     private class IndexIterable implements Iterable<Long> {

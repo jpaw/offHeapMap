@@ -6,8 +6,8 @@ import de.jpaw.collections.ByteArrayConverter;
 
 public class IndexUUID extends PrimitiveLongKeyOffHeapIndex<UUID> {
     
-    protected IndexUUID(ByteArrayConverter<UUID> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
-        super(converter, size, forShard, modes, withCommittedView);
+    protected IndexUUID(ByteArrayConverter<UUID> converter, int size, Shard forShard, int modes, boolean withCommittedView, String name) {
+        super(converter, size, forShard, modes, withCommittedView, name);
     }
 
     public static class Builder extends PrimitiveLongKeyOffHeapIndex.Builder<UUID, IndexUUID> {
@@ -17,7 +17,7 @@ public class IndexUUID extends PrimitiveLongKeyOffHeapIndex<UUID> {
         }
         @Override
         public IndexUUID build() {
-            return new IndexUUID(converter, hashSize, shard, mode, withCommittedView);
+            return new IndexUUID(converter, hashSize, shard, mode, withCommittedView, name);
         }
     }
     

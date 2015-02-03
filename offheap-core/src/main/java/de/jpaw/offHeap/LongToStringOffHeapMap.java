@@ -5,8 +5,8 @@ import de.jpaw.collections.ByteArrayConverter;
 /** Off heap storage for Strings. */
 public class LongToStringOffHeapMap extends  PrimitiveLongKeyOffHeapMap<String> {
 
-    protected LongToStringOffHeapMap(ByteArrayConverter<String> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
-        super(converter, size, forShard, modes, withCommittedView);
+    protected LongToStringOffHeapMap(ByteArrayConverter<String> converter, int size, Shard forShard, int modes, boolean withCommittedView, String name) {
+        super(converter, size, forShard, modes, withCommittedView, name);
     }
 
     public static class Builder extends PrimitiveLongKeyOffHeapMap.Builder<String, LongToStringOffHeapMap> {
@@ -16,7 +16,7 @@ public class LongToStringOffHeapMap extends  PrimitiveLongKeyOffHeapMap<String> 
         }
         @Override
         public LongToStringOffHeapMap build() {
-            return new LongToStringOffHeapMap(converter, hashSize, shard, mode, withCommittedView);
+            return new LongToStringOffHeapMap(converter, hashSize, shard, mode, withCommittedView, name);
         }
     }
     
