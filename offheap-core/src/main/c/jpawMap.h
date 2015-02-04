@@ -169,10 +169,10 @@ extern "C" {
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex
  * Method:    natIndexCreate
- * Signature: (JJJI[BI)V
+ * Signature: (JJJI[BII)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexCreate
-  (JNIEnv *, jclass, jlong, jlong, jlong, jint, jbyteArray, jint);
+  (JNIEnv *, jclass, jlong, jlong, jlong, jint, jbyteArray, jint, jint);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex
@@ -185,10 +185,10 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex
  * Method:    natIndexUpdate
- * Signature: (JJJII[BI)V
+ * Signature: (JJJII[BII)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexUpdate
-  (JNIEnv *, jclass, jlong, jlong, jlong, jint, jint, jbyteArray, jint);
+  (JNIEnv *, jclass, jlong, jlong, jlong, jint, jint, jbyteArray, jint, jint);
 
 #ifdef __cplusplus
 }

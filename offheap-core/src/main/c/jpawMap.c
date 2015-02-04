@@ -656,7 +656,7 @@ static struct dataEntry *create_new_entry(JNIEnv *env, jlong key, jbyteArray dat
     return e;
 }
 
-static struct dataEntry *create_new_index_entry(JNIEnv *env, jlong key, jint hash, jbyteArray data, jint length) {
+static struct dataEntry *create_new_index_entry(JNIEnv *env, jlong key, jint hash, jbyteArray data, jint offset, jint length) {
     // int uncompressed_length = (*env)->GetArrayLength(env, data);
     struct dataEntry *e = (struct dataEntry *)malloc(sizeof(struct dataEntry) + ROUND_UP_SIZE(length));
     if (!e)
@@ -669,7 +669,7 @@ static struct dataEntry *create_new_index_entry(JNIEnv *env, jlong key, jint has
     e->compressedSize = hash;
     e->key = key;
     if (length > 0)
-        (*env)->GetByteArrayRegion(env, data, 0, length, (jbyte *)e->data);
+        (*env)->GetByteArrayRegion(env, data, offset, length, (jbyte *)e->data);
     return e;
 }
 
@@ -750,7 +750,7 @@ JNIEXPORT jboolean JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMap_natSe
 
     struct dataEntry *previousEntry = setPutSub(mapdata, newEntry);
     record_change(env, (struct tx_log_hdr *)ctx, mapdata, previousEntry, newEntry);  // may throw an error
-    return (previousEntry == NULL);  // true if it was a new entry
+    return (previousEntry != NULL);  // true if an entry existed before
 }
 
 /*
@@ -1281,9 +1281,9 @@ static struct dataEntry * setPutSubIndexReplace(struct map *mapdata, int oldHash
  * Signature: (JJJI[B)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexCreate
-  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint hash, jbyteArray data, jint length) {
+  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint hash, jbyteArray data, jint offset, jint length) {
     struct map *mapdata = (struct map *) cMap;
-    struct dataEntry *newEntry = create_new_index_entry(env, key, hash, data, length);
+    struct dataEntry *newEntry = create_new_index_entry(env, key, hash, data, offset, length);
     if (!newEntry) {
         throwOutOfMemory(env);
         return;
@@ -1338,9 +1338,9 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natInde
  * Signature: (JJJII[B)V
  */
 JNIEXPORT void JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndex_natIndexUpdate
-  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint oldHash, jint newHash, jbyteArray newData, jint length) {
+  (JNIEnv *env, jclass me, jlong cMap, jlong ctx, jlong key, jint oldHash, jint newHash, jbyteArray newData, jint offset, jint length) {
     struct map *mapdata = (struct map *) cMap;
-    struct dataEntry *newEntry = create_new_index_entry(env, key, newHash, newData, length);
+    struct dataEntry *newEntry = create_new_index_entry(env, key, newHash, newData, offset, length);
     if (!newEntry) {
         throwOutOfMemory(env);
         return;

@@ -112,23 +112,25 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         natClear(cStruct, myShard.getTxCStruct());
     }
 
-    /** Removes the entry stored for key from the map (if it did exist). */
+    /** Removes the entry stored for key from the map (if it did exist).
+     * Returns true if the entry existed, false if not. */
     @Override
-    public void delete(long key) {
-        natDelete(cStruct, myShard.getTxCStruct(), key);
+    public boolean delete(long key) {
+        return natDelete(cStruct, myShard.getTxCStruct(), key);
     }
     
     /** Stores an entry in the map.
      * The new data will be compressed if it is bigger than the threshold passed in map creation.
-     * Deleting an entry can be done by passing null as the data pointer. */
+     * Deleting an entry can be done by passing null as the data pointer.
+     * Returns true if an entry of this key existed before, else false. */
     @Override
-    public void set(long key, V data) {
+    public boolean set(long key, V data) {
         if (data == null) {
-            delete(key);
+            return delete(key);
         } else {
             byte [] arr = converter.getBuffer(data);
             int len = converter.getLength();
-            natSet(cStruct, myShard.getTxCStruct(), key, arr, 0, len, len > maxUncompressedSize);
+            return natSet(cStruct, myShard.getTxCStruct(), key, arr, 0, len, len > maxUncompressedSize);
         }
     }
     
@@ -148,10 +150,10 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
     /** Stores an entry in the map, specified by a region within a byte array.
      * The new data will be compressed if it is bigger than the threshold passed in map creation.
      * Deleting an entry can be done by passing null as the data pointer. */
-    public void setFromBuffer(long key, byte [] data, int offset, int length) {
+    public boolean setFromBuffer(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, length > maxUncompressedSize);
+        return natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, length > maxUncompressedSize);
     }
 
 
