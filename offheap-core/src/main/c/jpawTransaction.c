@@ -1,4 +1,5 @@
 #include "jpawTransaction.h"
+#include "globalDefs.h"
 #include "globalMethods.h"
 
 
@@ -265,7 +266,7 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
 #endif
     struct tx_log_hdr *hdr = (struct tx_log_hdr *) cTx;
     int currentEntries = hdr->number_of_changes;
-    if (currentEntries > rollbackTo) {
+    if (currentEntries > rollbackTo && rollbackTo >= 0) {
         struct tx_log_list *chunk = hdr->chunks[currentEntries >> 8];
         while (currentEntries > rollbackTo) {
             if (!(currentEntries & 0xff))

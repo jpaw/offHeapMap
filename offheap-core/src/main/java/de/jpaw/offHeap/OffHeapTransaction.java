@@ -70,10 +70,12 @@ public class OffHeapTransaction {
         cStruct = natCreateTransaction(initialMode, 1L);
     }
     
+    /** Starts a new transaction. */
     public void beginTransaction(long ref) {
         natBeginTransaction(cStruct, ref);
     }
 
+    /** Undoes everything of the current transaction, irrespectively of any safepoint. */
     public void rollback() {
         if ((currentMode & TRANSACTIONAL) == 0)
             throw new RuntimeException("Not running in transactional mode");
@@ -81,17 +83,37 @@ public class OffHeapTransaction {
         lastSafepoint = 0;
     }
 
+    /** Commits everything of the current transaction. */
+    public void commit() {
+        rowsChanged += natCommit(cStruct);
+    }
+    
+    /** Sets a safepoint at the current position (simple API). Allows to rollback to this position. */
     public void setSafepoint() {
         lastSafepoint = natSetSafepoint(cStruct);
     }
     
+    /** Rolls back any change up to the previous set safepoint (simple API). With this API, no nested safepoints are possible. */ 
     public void rollbackToSafepoint() {
         natRollback(cStruct, lastSafepoint);
     }
     
-    public void commit() {
-        rowsChanged += natCommit(cStruct);
+    /** Sets an additional safepoint. Returns the new safepoint location. With this API, nested safepoints are possible,
+     * managed by the application. This operation does not affect the simple API's safepoint position. */
+    public int defineSafepoint() {
+        return natSetSafepoint(cStruct);
     }
+
+    /** Rolls back any change up to an application managed safepoint (obtained via some earlier call to defineSafepoint). */ 
+    public void rollbackToDefinedSafepoint(int position) {
+        if (lastSafepoint > position) {
+            // invalidate previous simple API call safepoint
+            lastSafepoint = position;
+        }
+        natRollback(cStruct, position);
+    }
+    
+    /** Closes the transaction object. After this call, no more operations are possible. Perform this at application shutdown time. */
     public void close() {
         natCloseTransaction(cStruct);
         cStruct = 0L;

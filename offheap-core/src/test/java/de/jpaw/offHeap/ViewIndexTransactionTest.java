@@ -1,5 +1,6 @@
 package de.jpaw.offHeap;
 
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import de.jpaw.collections.ByteArrayConverter;
@@ -25,7 +26,7 @@ public class ViewIndexTransactionTest {
         
         // index
         PrimitiveLongKeyOffHeapIndex<String> myIndex = new PrimitiveLongKeyOffHeapIndex<String>(
-                ByteArrayConverter.STRING_CONVERTER, 1000, s1, 0x31, true);  // transactional unique view
+                ByteArrayConverter.STRING_CONVERTER, 1000, s1, 0x31, true, "testIdx");  // transactional unique view
         PrimitiveLongKeyOffHeapIndexView<String> myIndexView = myIndex.getView();
         
         myMap.set(1L, "The");
@@ -48,7 +49,7 @@ public class ViewIndexTransactionTest {
         assert(myIndexView.size() == 1);
 
         assert(DATAVALUE.equals(myView.get(17L)));
-        assert(Long.valueOf(17L).equals(myIndexView.getUniqueKeyByIndex(INDEXVALUE)));
+        Assert.assertEquals(17L, myIndexView.getUniqueKeyByIndex(INDEXVALUE));
         
         myMap.remove(17L);
         myMap.set(3L, "was");
@@ -65,7 +66,7 @@ public class ViewIndexTransactionTest {
         assert(myIndexView.size() == 1);
 
         // can still read the index on the committed view...
-        assert(Long.valueOf(17L).equals(myIndexView.getUniqueKeyByIndex(INDEXVALUE)));
+        Assert.assertEquals(17L, myIndexView.getUniqueKeyByIndex(INDEXVALUE));
         
         tx1.commit();
         
@@ -75,7 +76,7 @@ public class ViewIndexTransactionTest {
         assert(myIndex.size() == 0);
         assert(myIndexView.size() == 0);
 
-        assert(myIndexView.getUniqueKeyByIndex(INDEXVALUE) == null);  // but now it should be deleted
+        Assert.assertEquals(myIndexView.getUniqueKeyByIndex(INDEXVALUE), 0);  // but now it should be deleted
 
         tx1.close();
         myMap.close();

@@ -10,8 +10,8 @@ package de.jpaw.collections;
  */
 public interface PrimitiveLongKeyMap<V> extends PrimitiveLongKeyMapView<V> {
 
-    // EXTRA! See hazelcast. put without returning value
-    public void set(long key, V value);
+    // EXTRA! See hazelcast. put without returning value (in asynchronous environments, even the boolean might not be accurate)
+    public boolean set(long key, V value);
     
     public V remove(long key);
     

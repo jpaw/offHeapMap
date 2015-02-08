@@ -20,7 +20,7 @@ public interface PrimitiveLongKeyMapView<V> extends OffHeapBaseMap, Iterable<Pri
     public V put(long key, V value);
 
     // EXTRA! See hazelcast. remove without returning value
-    public void delete(long key);
+    public boolean delete(long key);       // this throws an exception if applied to a view!. It's here to support the Iterator
 
 //    public PrimitiveLongSet keySet();
 //    public Collection<V> values();

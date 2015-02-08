@@ -9,7 +9,7 @@ OBJDIR=target/o
 TARGETDIR=target/lib
 TARGETLIB=$(TARGETDIR)/$(TARGET)
 OBJECTS=$(OBJDIR)/jpawMap.o $(OBJDIR)/jpawTransaction.o
-INCLUDES=$(SRCDIR)/jpawMap.h $(SRCDIR)/jpawTransaction.h $(SRCDIR)/globalMethods.h
+INCLUDES=$(SRCDIR)/jpawMap.h $(SRCDIR)/jpawTransaction.h $(SRCDIR)/globalMethods.h $(SRCDIR)/globalDefs.h
 
 all: $(TARGETLIB)
 

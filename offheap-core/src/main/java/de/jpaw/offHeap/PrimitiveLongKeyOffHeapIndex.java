@@ -10,19 +10,19 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
     // TODO: use the builder pattern here, the number of optional parameters is growing...
     public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
-            int size, Shard forShard, int modes, boolean withCommittedView) {
+            int size, Shard forShard, int modes, boolean withCommittedView, String name) {
         // construct the map index map
-        super(natOpen(size, modes, withCommittedView), false, indexConverter);
+        super(natOpen(size, modes, withCommittedView), false, indexConverter, name);
         
         // register at transaction for the same shard
         myShard = forShard;
-        myView = withCommittedView ? new PrimitiveLongKeyOffHeapIndexView<I>(natGetView(cStruct), true, indexConverter) : null;
+        myView = withCommittedView ? new PrimitiveLongKeyOffHeapIndexView<I>(natGetView(cStruct), true, indexConverter, name) : null;
     }
     
     public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
-            int size, int modes) {
-        this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false);
+            int size, int modes, String name) {
+        this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false, name);
     }
     
     public abstract static class Builder<I, T extends PrimitiveLongKeyOffHeapIndex<I>> {
@@ -31,6 +31,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         protected int mode = 0xa1;
         protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
         protected boolean withCommittedView = false;
+        protected String name = null;
         
         public Builder(ByteArrayConverter<I> converter) {
             this.converter = converter;
@@ -58,19 +59,23 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
             this.withCommittedView = true;
             return this;
         }
+        public Builder<I, T> setName(String name) {
+            this.name = name;
+            return this;
+        }
         public abstract T build();
     }
     
     
     /** Read an entry and return its key, or null if it does not exist. */
-    private static native void natIndexCreate(long cMap, long ctx, long key, int indexHash, byte [] indexData);
+    private static native void natIndexCreate(long cMap, long ctx, long key, int indexHash, byte [] indexData, int offset, int length);
 
     /** Read an entry and return its key, or null if it does not exist. indexHash provided just for plausi check. */
     private static native void natIndexDelete(long cMap, long ctx, long key, int indexHash);
 
     /** Update some existing key with a new one. The old and new are different, this has been checked by the caller.
      * oldKeyHash provided just for plausi check. */
-    private static native void natIndexUpdate(long cMap, long ctx, long key, int oldKeyHash, int newKeyHash, byte [] newKeyData);
+    private static native void natIndexUpdate(long cMap, long ctx, long key, int oldKeyHash, int newKeyHash, byte [] newKeyData, int offset, int length);
 
 
     /** Update the key entry for the data record of artificial key "key" from "oldIndex" to "newIndex".
@@ -86,7 +91,8 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         if (oldIndex == null) {
             // insert or no-op operation
             if (newIndex != null) {
-                natIndexCreate(cStruct, myShard.getTxCStruct(), key, indexHash(newIndex), indexData(newIndex));
+                byte [] indexData = converter.getBuffer(newIndex);
+                natIndexCreate(cStruct, myShard.getTxCStruct(), key, indexHash(newIndex), indexData, 0, converter.getLength());
             }
         } else {
             int oldHash = indexHash(oldIndex);
@@ -94,9 +100,11 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
                 natIndexDelete(cStruct, myShard.getTxCStruct(), key, oldHash);
             } else {
                 int newHash = indexHash(newIndex);
-                if (oldHash != newHash || oldIndex.equals(newIndex))
+                if (oldHash != newHash || oldIndex.equals(newIndex)) {
                     // only invoke the native method if old and new key are different
-                    natIndexUpdate(cStruct, myShard.getTxCStruct(), key, oldHash, newHash, indexData(newIndex));
+                    byte [] indexData = converter.getBuffer(newIndex);
+                    natIndexUpdate(cStruct, myShard.getTxCStruct(), key, oldHash, newHash, indexData, 0, converter.getLength());
+                }
             }
         }
     }
@@ -104,16 +112,23 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
     /** Update the key, I is a max 32 bit primitive type which cannot be null. */
     public void updateDirect(long key, int oldIndex, int newIndex) {
         if (oldIndex != newIndex)
-            natIndexUpdate(cStruct, myShard.getTxCStruct(), key, oldIndex, newIndex, null);
+            natIndexUpdate(cStruct, myShard.getTxCStruct(), key, oldIndex, newIndex, null, 0, 0);
+    }
+    public void updateDirect(long key, int oldIndexHash, int newIndexHash, byte [] buffer, int offset, int length) {
+        natIndexUpdate(cStruct, myShard.getTxCStruct(), key, oldIndexHash, newIndexHash, buffer, offset, length);
     }
     
     public void create(long key, I index) {
         if (index != null) {
-            natIndexCreate(cStruct, myShard.getTxCStruct(), key, indexHash(index), indexData(index));
+            byte [] indexData = converter.getBuffer(index);
+            natIndexCreate(cStruct, myShard.getTxCStruct(), key, indexHash(index), indexData, 0, converter.getLength());
         }
     }
     public void createDirect(long key, int index) {
-        natIndexCreate(cStruct, myShard.getTxCStruct(), key, index, null);
+        natIndexCreate(cStruct, myShard.getTxCStruct(), key, index, null, 0, 0);
+    }
+    public void createDirect(long key, int indexHash, byte [] buffer, int offset, int length) {
+        natIndexCreate(cStruct, myShard.getTxCStruct(), key, indexHash, buffer, offset, length);
     }
     
     public void delete(long key, I index) {

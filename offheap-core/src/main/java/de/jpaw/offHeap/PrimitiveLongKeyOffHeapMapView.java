@@ -22,8 +22,8 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     }
     
     // class can only be instantiated from a parent
-    protected PrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView) {
-        super(converter, cMap, isView);
+    protected PrimitiveLongKeyOffHeapMapView(ByteArrayConverter<V> converter, long cMap, boolean isView, String name) {
+        super(converter, cMap, isView, name);
     }
     
     //
@@ -66,9 +66,10 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     // Also, the decision when to compress an entry is done within Java for added flexibility (for example overwriting the decision method).
     //
     
-    /** Removes the entry stored for key from the map (if it did exist). */
+    /** Removes the entry stored for key from the map (if it did exist). 
+     * @return */
     @Override
-    public void delete(long key) {
+    public boolean delete(long key) {
         throw new UnsupportedOperationException("Cannot delete on a readonly view");
     }
     

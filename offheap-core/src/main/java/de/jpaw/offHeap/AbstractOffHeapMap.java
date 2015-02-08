@@ -11,13 +11,15 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
     /** Only used by native code, to store the off heap address of the structure. */
     public final ByteArrayConverter<T> converter;  // this is usually the superclass itself
     public final boolean isView;
+    public final String name;
     protected final long cStruct;
     
     // class can only be instantiated from a parent
-    protected AbstractOffHeapMap(ByteArrayConverter<T> converter, long cMap, boolean isView) {
+    protected AbstractOffHeapMap(ByteArrayConverter<T> converter, long cMap, boolean isView, String name) {
         this.converter = converter;
         this.cStruct = cMap;
         this.isView = isView;
+        this.name = name;
     }
     
     //
@@ -100,6 +102,4 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
     public boolean isEmpty() {
         return size() == 0;
     }
-    
-
 }

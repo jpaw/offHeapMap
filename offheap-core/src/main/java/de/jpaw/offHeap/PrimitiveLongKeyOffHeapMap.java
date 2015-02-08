@@ -33,17 +33,14 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
      * data may not be null (use get(key) for that purpose). */
     private static native byte [] natPut(long cMap, long ctx, long key, byte [] data, int offset, int length, boolean doCompress);
     
-    protected boolean shouldICompressThis(byte [] data) {
-        return data.length > maxUncompressedSize;
-    }
-
 
     
-    // TODO: use the builder pattern here, the number of optional parameters is growing...
-    protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes, boolean withCommittedView) {
-        super(converter, natOpen(size, modes, withCommittedView), false);
+    // external callers should use the builder pattern here, the number of optional parameters is growing...
+    protected PrimitiveLongKeyOffHeapMap(ByteArrayConverter<V> converter, int size, Shard forShard, int modes,
+            boolean withCommittedView, String name) {
+        super(converter, natOpen(size, modes, withCommittedView), false, name);
         myShard = forShard;
-        myView = withCommittedView ? new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true) : null;
+        myView = withCommittedView ? new PrimitiveLongKeyOffHeapMapView<V>(converter, natGetView(cStruct), true, name) : null;
     }
     
     public abstract static class Builder<V, T extends PrimitiveLongKeyOffHeapMap<V>> {
@@ -52,6 +49,7 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         protected int mode = 0x81;
         protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
         protected boolean withCommittedView = false;
+        protected String name = null;
         
         public Builder(ByteArrayConverter<V> converter) {
             this.converter = converter;
@@ -70,6 +68,10 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         }
         public Builder<V, T> addCommittedView() {
             this.withCommittedView = true;
+            return this;
+        }
+        public Builder<V, T> setName(String name) {
+            this.name = name;
             return this;
         }
         public abstract T build();
@@ -110,22 +112,25 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         natClear(cStruct, myShard.getTxCStruct());
     }
 
-    /** Removes the entry stored for key from the map (if it did exist). */
+    /** Removes the entry stored for key from the map (if it did exist).
+     * Returns true if the entry existed, false if not. */
     @Override
-    public void delete(long key) {
-        natDelete(cStruct, myShard.getTxCStruct(), key);
+    public boolean delete(long key) {
+        return natDelete(cStruct, myShard.getTxCStruct(), key);
     }
     
     /** Stores an entry in the map.
      * The new data will be compressed if it is bigger than the threshold passed in map creation.
-     * Deleting an entry can be done by passing null as the data pointer. */
+     * Deleting an entry can be done by passing null as the data pointer.
+     * Returns true if an entry of this key existed before, else false. */
     @Override
-    public void set(long key, V data) {
+    public boolean set(long key, V data) {
         if (data == null) {
-            delete(key);
+            return delete(key);
         } else {
-            byte [] arr = converter.valueTypeToByteArray(data);
-            natSet(cStruct, myShard.getTxCStruct(), key, arr, 0, arr.length, shouldICompressThis(arr));
+            byte [] arr = converter.getBuffer(data);
+            int len = converter.getLength();
+            return natSet(cStruct, myShard.getTxCStruct(), key, arr, 0, len, len > maxUncompressedSize);
         }
     }
     
@@ -136,18 +141,19 @@ implements PrimitiveLongKeyMap<V>, DatabaseIO {
         if (data == null) {
             return converter.byteArrayToValueType(natRemove(cStruct, myShard.getTxCStruct(), key));
         } else {
-            byte [] arr = converter.valueTypeToByteArray(data);
-            return converter.byteArrayToValueType(natPut(cStruct, myShard.getTxCStruct(), key, arr, 0, arr.length, shouldICompressThis(arr)));
+            byte [] arr = converter.getBuffer(data);
+            int len = converter.getLength();
+            return converter.byteArrayToValueType(natPut(cStruct, myShard.getTxCStruct(), key, arr, 0, len, len > maxUncompressedSize));
         }
     }
     
     /** Stores an entry in the map, specified by a region within a byte array.
      * The new data will be compressed if it is bigger than the threshold passed in map creation.
      * Deleting an entry can be done by passing null as the data pointer. */
-    public void setFromBuffer(long key, byte [] data, int offset, int length) {
+    public boolean setFromBuffer(long key, byte [] data, int offset, int length) {
         if (data == null || offset < 0 || offset + length > data.length)
             throw new IllegalArgumentException();
-        natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, shouldICompressThis(data));
+        return natSet(cStruct, myShard.getTxCStruct(), key, data, offset, length, length > maxUncompressedSize);
     }
 
 
