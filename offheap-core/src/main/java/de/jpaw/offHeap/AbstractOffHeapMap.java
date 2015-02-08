@@ -102,6 +102,4 @@ public class AbstractOffHeapMap<T> implements OffHeapBaseMap {
     public boolean isEmpty() {
         return size() == 0;
     }
-    
-
 }
