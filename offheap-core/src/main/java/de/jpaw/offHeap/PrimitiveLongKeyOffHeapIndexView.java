@@ -65,7 +65,7 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
         @Override
         public Iterator<Long> iterator() {
             return batchSize > 0
-                ? new BatchedPrimitiveLongKeyOffHeapViewIterator(index, batchSize)
+                ? new BatchedPrimitiveLongKeyOffHeapViewIterator(index, batchSize, 0)
                 : new PrimitiveLongKeyOffHeapViewIterator(index);
         }
     }
@@ -84,8 +84,8 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
         return new PrimitiveLongKeyOffHeapViewIterator(index);
     }
     
-    public BatchedPrimitiveLongKeyOffHeapViewIterator iterator(I index, int batchSize) {
-        return new BatchedPrimitiveLongKeyOffHeapViewIterator(index, batchSize);
+    public BatchedPrimitiveLongKeyOffHeapViewIterator iterator(I index, int batchSize, int recordsToSkip) {
+        return new BatchedPrimitiveLongKeyOffHeapViewIterator(index, batchSize, recordsToSkip);
     }
     
     public class PrimitiveLongKeyOffHeapViewIterator implements PrimitiveLongIterator {
@@ -145,21 +145,22 @@ public class PrimitiveLongKeyOffHeapIndexView<I> extends AbstractOffHeapMap<I> {
         private final long [] nextEntries;
         private final int batchSize;
         
-        private native long natIterateStart(long cStructOfMap, int hash, byte [] data, int length, long [] entries, int batchSize);
+        private native long natIterateStart(long cStructOfMap, int hash, byte [] data, int length, long [] entries, int batchSize, int recordsToSkip);
         private native long natIterate(long previousEntryPtr, long [] entries, int batchSize);
         
         /** Constructor, protected because it can only be created by the Map itself. */
-        private BatchedPrimitiveLongKeyOffHeapViewIterator(I index, int batchSize) {
+        private BatchedPrimitiveLongKeyOffHeapViewIterator(I index, int batchSize, int recordsToSkip) {
             if (batchSize < 1) {
                 throw new IllegalArgumentException("batch size must be at least 1, got " + batchSize);
             }
             nextEntries = new long [batchSize];
             this.batchSize = batchSize;
             if (converter == null) {
-                nextEntryPtr = natIterateStart(cStruct, indexHash(index), null, 0, nextEntries, batchSize);
+                nextEntryPtr = natIterateStart(cStruct, indexHash(index), null, 0, nextEntries, batchSize, recordsToSkip
+                        );
             } else {
                 byte [] data = converter.getBuffer(index); 
-                nextEntryPtr = natIterateStart(cStruct, indexHash(index), data, converter.getLength(), nextEntries, batchSize);
+                nextEntryPtr = natIterateStart(cStruct, indexHash(index), data, converter.getLength(), nextEntries, batchSize, recordsToSkip);
             }
         }
         

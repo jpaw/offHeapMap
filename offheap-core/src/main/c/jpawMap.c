@@ -1513,7 +1513,7 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
 static struct dataEntry *findIndexEntries(
         JNIEnv *env, jobject myClass,
         struct dataEntry *e, int len, int newHash, const void *data,
-        jlongArray dest, jint batchSize) {
+        jlongArray dest, jint batchSize, jint recordsToSkip) {
     int found = 0;
     jlong tmp[batchSize];
     while (e && found < batchSize) {
@@ -1521,9 +1521,13 @@ static struct dataEntry *findIndexEntries(
         if (e->compressedSize == newHash && len == e->uncompressedSize) {
             if (len == 0 || !memcmp(e->data, data, len)) {
                 // match found with same index
-                tmp[found++] = e->key;
-                if (found == batchSize)
-                    break;      // do not advance, as e must stay on some matching entry (index data is retrieved from here)
+                if (recordsToSkip > 0) {
+                    --recordsToSkip;
+                } else {
+                    tmp[found++] = e->key;
+                    if (found == batchSize)
+                        break;      // do not advance, as e must stay on some matching entry (index data is retrieved from here)
+                }
             }
         }
         e = e->nextSameHash;
@@ -1539,10 +1543,10 @@ static struct dataEntry *findIndexEntries(
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_BatchedPrimitiveLongKeyOffHeapViewIterator
  * Method:    natIterateStart
- * Signature: (JI[BI[JI)J
+ * Signature: (JI[BI[JII)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024BatchedPrimitiveLongKeyOffHeapViewIterator_natIterateStart
-  (JNIEnv *env, jobject myClass, jlong cMap, jint hash, jbyteArray data, jint length, jlongArray dest, jint batchSize) {
+  (JNIEnv *env, jobject myClass, jlong cMap, jint hash, jbyteArray data, jint length, jlongArray dest, jint batchSize, jint recordsToSkip) {
   struct map *mapdata = (struct map *) cMap;
   int slot = (hash & 0x7fffffff) % mapdata->hashTableSize;
   struct dataEntry *e = mapdata->keyHash[slot];
@@ -1558,10 +1562,10 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
           return NO_ENTRY_PRESENT;
       }
       (*env)->GetByteArrayRegion(env, data, 0, length, (jbyte *)dataCopy);
-      e = findIndexEntries(env, myClass, e, length, hash, dataCopy, dest, batchSize);
+      e = findIndexEntries(env, myClass, e, length, hash, dataCopy, dest, batchSize, recordsToSkip);
       freeTempBuffer(mapdata, dataCopy);
   } else {
-      e = findIndexEntries(env, myClass, e, length, hash, NULL, dest, batchSize);
+      e = findIndexEntries(env, myClass, e, length, hash, NULL, dest, batchSize, recordsToSkip);
   }
   return (jlong)e;
 }
