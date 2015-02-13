@@ -242,10 +242,10 @@ extern "C" {
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_BatchedPrimitiveLongKeyOffHeapViewIterator
  * Method:    natIterateStart
- * Signature: (JI[BI[JI)J
+ * Signature: (JI[BI[JII)J
  */
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024BatchedPrimitiveLongKeyOffHeapViewIterator_natIterateStart
-  (JNIEnv *, jobject, jlong, jint, jbyteArray, jint, jlongArray, jint);
+  (JNIEnv *, jobject, jlong, jint, jbyteArray, jint, jlongArray, jint, jint);
 
 /*
  * Class:     de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_BatchedPrimitiveLongKeyOffHeapViewIterator
