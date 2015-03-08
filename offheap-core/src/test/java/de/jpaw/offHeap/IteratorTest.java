@@ -16,7 +16,7 @@ public class IteratorTest {
     static public final byte [] b4 = "4 Four".getBytes();
     static public final long keys[] = { 12312L, 23423L, 6166L, 182638L };
     static public final byte [] data[] = { b1, b2, b3, b4 };
-    
+
     public void runIteratorTest() {
         int i;
         PrimitiveLongKeyMap<byte[]> myMap = LongToByteArrayOffHeapMap.forHashSize(8);
@@ -24,19 +24,19 @@ public class IteratorTest {
         assert(data[1] == b2);
         assert(data[2] == b3);
         assert(data[3] == b4);
-        
+
         for (i = 0; i < 4; ++i)
             myMap.set(keys[i], data[i]);
-        
+
         // explicit
 //        Iterator<Entry<byte[]>> iter = myMap.iterator();
 //        boolean hasAtLeastOne = iter.hasNext();
 //        Entry<byte[]> e1 = iter.next();
-        
+
         for (Entry<byte[]> e : myMap) {
             System.out.println("Got <" + e.getKey() + ", " + new String(e.getValue()) + ">");
         }
-        
+
         myMap.clear();
     }
 
@@ -50,21 +50,21 @@ public class IteratorTest {
                 iter.remove();
         }
     }
-    
+
     public void runIteratorWithDeleteTest() {
         int i;
         PrimitiveLongKeyMap<byte[]> myMap = LongToByteArrayOffHeapMap.forHashSize(8);
-        
+
         for (i = 0; i < 4; ++i)
             myMap.set(keys[i], data[i]);
-        
+
         // using explicit iterator
         runWithDelete(myMap.iterator(), "initial run");
         runWithDelete(myMap.iterator(), "run after deleted first element");
         runWithDelete(myMap.iterator(), "run after deleted second element");
         runWithDelete(myMap.iterator(), "run after deleted third element");  // this run does not delete any more element
         assert(myMap.size() == 1);
-        
+
         myMap.clear();
     }
 

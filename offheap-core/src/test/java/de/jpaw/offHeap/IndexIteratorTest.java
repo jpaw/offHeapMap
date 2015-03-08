@@ -23,7 +23,7 @@ public class IndexIteratorTest {
 
         int cnt;
         PrimitiveLongIterator myIt;
-        
+
         // single-call index
         myIt = myIndex.iterator("IND444");
         cnt = 0;
@@ -32,7 +32,7 @@ public class IndexIteratorTest {
             ++cnt;
         }
         Assert.assertEquals(cnt, 5);
-        
+
         // batched index
         myIt = myIndex.iterator("IND444", 20, 0);
         cnt = 0;
@@ -41,7 +41,7 @@ public class IndexIteratorTest {
             ++cnt;
         }
         Assert.assertEquals(cnt, 5);
-        
+
         // batched index with offset
         System.out.println("Now with skip = 3:");
         myIt = myIndex.iterator("IND444", 3, 3);
@@ -51,7 +51,7 @@ public class IndexIteratorTest {
             ++cnt;
         }
         Assert.assertEquals(cnt, 2);
-        
+
         myIndex.close();
     }
 }

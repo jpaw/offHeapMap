@@ -19,7 +19,7 @@ public class LongToStringOffHeapMap extends  PrimitiveLongKeyOffHeapMap<String> 
             return new LongToStringOffHeapMap(converter, hashSize, shard, mode, withCommittedView, name);
         }
     }
-    
+
     // convenience constructor
     public static LongToStringOffHeapMap forHashSize(int hashSize) {
         return new Builder().setHashSize(hashSize).build();
