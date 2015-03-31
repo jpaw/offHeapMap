@@ -6,7 +6,7 @@ public interface OffHeapBaseMap {
      * (i.e. Entry.setValue() is supported and Iterator.remove()).
      */
     public boolean isReadonly();
-    
+
     public int size();
 
     public boolean isEmpty();

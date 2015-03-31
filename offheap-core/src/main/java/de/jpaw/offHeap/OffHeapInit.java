@@ -7,7 +7,7 @@ public class OffHeapInit {
         System.loadLibrary("lz4");      // Load native library at runtime
         System.loadLibrary("jpawMap");  // Load native library at runtime
     }
-    
+
     // just a hook to perform the loading
     public static void init() {
     }

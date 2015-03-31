@@ -189,14 +189,14 @@ public class OffHeapMapBench {
     private static final long KEY_PERM_SMALL = 552528219828L;
     private static final long KEY_PERM_1KB = 552528219829L;
     private static final byte [] SHORTDATA = { (byte)1, (byte)2, (byte)3 };
-    
+
     private LongToByteArrayOffHeapMap mapNoTransactions = null;
     private LongToByteArrayOffHeapMap mapNoTransactionsComp = null;
     private LongToByteArrayOffHeapMap mapWithTransactions = null;
     private Shard defaultShard = new Shard();
     private OffHeapTransaction transaction = null;
     private byte [] data1KB = null;
-    
+
     @Setup
     public void setUp() throws UnsupportedEncodingException {
         mapNoTransactions = LongToByteArrayOffHeapMap.forHashSize(1000);
@@ -206,7 +206,7 @@ public class OffHeapMapBench {
         transaction = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
         defaultShard.setOwningTransaction(transaction);
         data1KB = (TEXT + TEXT + TEXT + TEXT).substring(0, 1024).getBytes("UTF-8");
-        
+
         mapNoTransactions.set(KEY_PERM_SMALL, SHORTDATA);
         mapNoTransactions.set(KEY_PERM_1KB, data1KB);
         mapNoTransactionsComp.set(KEY_PERM_SMALL, SHORTDATA);
@@ -220,7 +220,7 @@ public class OffHeapMapBench {
         mapWithTransactions.close();
         transaction.close();
     }
-    
+
     @Benchmark
     public void sizeOpNoTx(Blackhole bh) {
         bh.consume(mapNoTransactions.size());
@@ -236,8 +236,8 @@ public class OffHeapMapBench {
         transaction.commit();
     }
 
-    
-    
+
+
     @Benchmark
     public void insertSmallOpNoTx() {
         mapNoTransactions.set(KEY, SHORTDATA);
@@ -259,29 +259,29 @@ public class OffHeapMapBench {
     }
 
 
-    
+
     @Benchmark
     public void getSmallOp(Blackhole bh) {
         bh.consume(mapNoTransactions.get(KEY_PERM_SMALL));
     }
-    
+
     @Benchmark
     public void get1KBOp(Blackhole bh) {
         bh.consume(mapNoTransactions.get(KEY_PERM_1KB));
     }
-    
+
     @Benchmark
     public void getSmallCompressedOp(Blackhole bh) {
         bh.consume(mapNoTransactionsComp.get(KEY_PERM_SMALL));
     }
-    
+
     @Benchmark
     public void get1KBCompressedOp(Blackhole bh) {
         bh.consume(mapNoTransactionsComp.get(KEY_PERM_1KB));
     }
 
 
-    
+
     @Benchmark
     public void insertGetOpNoTx(Blackhole bh) {
         mapNoTransactions.set(KEY, SHORTDATA);
@@ -293,13 +293,13 @@ public class OffHeapMapBench {
         mapNoTransactions.set(KEY, SHORTDATA);
         mapNoTransactions.delete(KEY);
     }
-    
+
     @Benchmark
     public void insertCommitOp() {
         mapWithTransactions.set(KEY, SHORTDATA);
         transaction.commit();
     }
-    
+
     @Benchmark
     public void insertCommitGetOp(Blackhole bh) {
         mapWithTransactions.set(KEY, SHORTDATA);
@@ -313,12 +313,12 @@ public class OffHeapMapBench {
         mapWithTransactions.delete(KEY);
         transaction.commit();
     }
-    
+
     @Benchmark
     public void deleteOpNoTx() {
         mapNoTransactions.delete(KEY);
     }
-    
+
     @Benchmark
     public void deleteOpWithTx() {
         mapWithTransactions.delete(KEY);

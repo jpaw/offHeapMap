@@ -4,27 +4,27 @@ import de.jpaw.collections.ByteArrayConverter;
 
 public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapIndexView<I> {
     protected final PrimitiveLongKeyOffHeapIndexView<I> myView;
-    
+
     protected final Shard myShard;
-    
+
     // TODO: use the builder pattern here, the number of optional parameters is growing...
     public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
             int size, Shard forShard, int modes, boolean withCommittedView, String name) {
         // construct the map index map
         super(natOpen(size, modes, withCommittedView), false, indexConverter, name);
-        
+
         // register at transaction for the same shard
         myShard = forShard;
         myView = withCommittedView ? new PrimitiveLongKeyOffHeapIndexView<I>(natGetView(cStruct), true, indexConverter, name) : null;
     }
-    
+
     public PrimitiveLongKeyOffHeapIndex(
             ByteArrayConverter<I> indexConverter,
             int size, int modes, String name) {
         this(indexConverter, size, Shard.TRANSACTIONLESS_DEFAULT_SHARD, modes, false, name);
     }
-    
+
     public abstract static class Builder<I, T extends PrimitiveLongKeyOffHeapIndex<I>> {
         protected final ByteArrayConverter<I> converter;
         protected int hashSize = 4096;
@@ -32,7 +32,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         protected Shard shard = Shard.TRANSACTIONLESS_DEFAULT_SHARD;
         protected boolean withCommittedView = false;
         protected String name = null;
-        
+
         public Builder(ByteArrayConverter<I> converter) {
             this.converter = converter;
         }
@@ -65,8 +65,8 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         }
         public abstract T build();
     }
-    
-    
+
+
     /** Read an entry and return its key, or null if it does not exist. */
     private static native void natIndexCreate(long cMap, long ctx, long key, int indexHash, byte [] indexData, int offset, int length);
 
@@ -79,11 +79,11 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
 
 
     /** Update the key entry for the data record of artificial key "key" from "oldIndex" to "newIndex".
-     * Both "oldIndex" and "newIndex" may be null 
+     * Both "oldIndex" and "newIndex" may be null
      * @param key
      * @param oldIndex
      * @param newIndex
-     * 
+     *
      * throws DuplicateKeyException if the index is flagged as unique and the key exists already before.
      * throws InconsistentIndexException if for remove or update, no old entry of matching content could be found
      */
@@ -108,7 +108,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
             }
         }
     }
-    
+
     /** Update the key, I is a max 32 bit primitive type which cannot be null. */
     public void updateDirect(long key, int oldIndex, int newIndex) {
         if (oldIndex != newIndex)
@@ -117,7 +117,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
     public void updateDirect(long key, int oldIndexHash, int newIndexHash, byte [] buffer, int offset, int length) {
         natIndexUpdate(cStruct, myShard.getTxCStruct(), key, oldIndexHash, newIndexHash, buffer, offset, length);
     }
-    
+
     public void create(long key, I index) {
         if (index != null) {
             byte [] indexData = converter.getBuffer(index);
@@ -130,7 +130,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
     public void createDirect(long key, int indexHash, byte [] buffer, int offset, int length) {
         natIndexCreate(cStruct, myShard.getTxCStruct(), key, indexHash, buffer, offset, length);
     }
-    
+
     public void delete(long key, I index) {
         if (index != null) {
             natIndexDelete(cStruct, myShard.getTxCStruct(), key, indexHash(index));
@@ -145,7 +145,7 @@ public class PrimitiveLongKeyOffHeapIndex<I> extends PrimitiveLongKeyOffHeapInde
         natClose(cStruct);
 //        cStruct = 0L;
     }
-    
+
     public PrimitiveLongKeyOffHeapIndexView<I> getView() {
         return myView;
     }

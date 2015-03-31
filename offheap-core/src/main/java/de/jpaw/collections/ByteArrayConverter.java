@@ -8,20 +8,20 @@ import java.util.UUID;
 public interface ByteArrayConverter<V> {
     /** Returns the value type for a given byte array. */
     V byteArrayToValueType(byte [] arg);
-    
+
     /** Returns a byte array for the value. Usually this involves copying data, therefore use of getBuffer and getLength is preferred. */
     byte [] valueTypeToByteArray(V arg);
-    
+
     /** Returns a byte array for the value, but the array may be too long. */
     byte [] getBuffer(V arg);
-    
+
     /** Returns the length of the previous getBuffer operation and clears the internal temporary buffer. */
     int getLength();
-    
+
     static public final Charset DEFAULT_CS = StandardCharsets.UTF_8;
     static public final ByteArrayConverter<String> STRING_CONVERTER = new ByteArrayConverter<String>() {
         private byte [] previous;
-        
+
         @Override
         public byte[] valueTypeToByteArray(String arg) {
             return arg == null ? null : arg.getBytes(DEFAULT_CS);
@@ -42,11 +42,11 @@ public interface ByteArrayConverter<V> {
             return len;
         }
     };
-    
+
     // byte converter is actually a no op converter
     static public final ByteArrayConverter<byte []> BYTE_CONVERTER = new ByteArrayConverter<byte []>() {
         private int previousLen;
-        
+
         @Override
         public byte[] valueTypeToByteArray(byte[] arg) {
             return arg;
@@ -65,11 +65,11 @@ public interface ByteArrayConverter<V> {
             return previousLen;
         }
     };
-    
+
     // see http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/primitives/Longs.html or
     // http://stackoverflow.com/questions/4485128/how-do-i-convert-long-to-byte-and-back-in-java
     static public final ByteArrayConverter<Long> LONG_CONVERTER = new ByteArrayConverter<Long>() {
-        
+
         @Override
         public byte[] valueTypeToByteArray(Long arg) {
             return arg == null ? null : ByteBuffer.allocate(8).putLong(arg).array();
@@ -88,7 +88,7 @@ public interface ByteArrayConverter<V> {
             return 8;
         }
     };
-    
+
     static public final ByteArrayConverter<UUID> UUID_CONVERTER = new ByteArrayConverter<UUID>() {
         @Override
         public byte[] valueTypeToByteArray(UUID arg) {
@@ -105,7 +105,7 @@ public interface ByteArrayConverter<V> {
             final ByteBuffer b = ByteBuffer.wrap(arg);
             final long msb = b.getLong();
             final long lsb = b.getLong();
-            return new UUID(msb, lsb); 
+            return new UUID(msb, lsb);
         }
         @Override
         public byte[] getBuffer(UUID arg) {

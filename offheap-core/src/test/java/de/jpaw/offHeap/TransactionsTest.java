@@ -11,18 +11,18 @@ public class TransactionsTest {
     static public final byte [] b2 = "2 Two".getBytes();
     static public final byte [] b3 = "3 Three".getBytes();
     static public final byte [] b4 = "4 Four".getBytes();
-    
+
     private void doAssert(LongToByteArrayOffHeapMap myMap, byte [] what) throws Exception {
         byte [] result = myMap.get(KEY);
         if (!Arrays.equals(result, what))
             throw new Exception("Compare fault: got " + new String(result) + " instead of " + new String(what));
     }
-    
+
     public void runTxTest() throws Exception {
         OffHeapTransaction tx1 = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
-        
+
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
         myMap.set(KEY, b1);
         tx1.setSafepoint();
@@ -32,16 +32,16 @@ public class TransactionsTest {
         doAssert(myMap, b1);
         tx1.rollback();
         doAssert(myMap, null);
-       
+
         myMap.close();
         tx1.close();
     }
-    
+
     public void runTx2Test() throws Exception {
         OffHeapTransaction tx1 = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
-        
+
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
         myMap.set(KEY, b1);
         tx1.commit();
@@ -49,7 +49,7 @@ public class TransactionsTest {
         doAssert(myMap, b2);
         tx1.rollback();
         doAssert(myMap, b1);
-       
+
         myMap.close();
         tx1.close();
     }
@@ -58,7 +58,7 @@ public class TransactionsTest {
         OffHeapTransaction tx1 = new OffHeapTransaction(OffHeapTransaction.TRANSACTIONAL);
         Shard s1 = new Shard();
         s1.setOwningTransaction(tx1);
-        
+
         LongToByteArrayOffHeapMap myMap = new LongToByteArrayOffHeapMap.Builder().setHashSize(1000).setShard(s1).build();
         myMap.set(KEY, b1);
         tx1.commit();
@@ -72,13 +72,13 @@ public class TransactionsTest {
         tx1.rollback();
         assert(myMap.size() == 1);
         doAssert(myMap, b1);
-        
+
         myMap.clear();
         tx1.commit();
         assert(myMap.size() == 0);
         tx1.rollback();
         assert(myMap.size() == 0);
-       
+
         myMap.close();
         tx1.close();
     }
