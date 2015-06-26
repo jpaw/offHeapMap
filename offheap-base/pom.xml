@@ -9,7 +9,7 @@
     </parent>
 
     <artifactId>offheap-base</artifactId>
-    <version>0.1.5-SNAPSHOT</version>
+    <version>0.1.5</version>
     <packaging>pom</packaging>
 
     <properties>
