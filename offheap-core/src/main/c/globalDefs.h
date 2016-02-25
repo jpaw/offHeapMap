@@ -74,4 +74,3 @@ struct tx_log_hdr {
     jlong lastCommittedRefOnViews;
     struct tx_log_list *chunks[TX_LOG_ENTRIES_PER_CHUNK_LV1];
 };
-

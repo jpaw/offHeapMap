@@ -4,7 +4,7 @@ This repository contains a performance study, what's achievable using JNI.
 It offers an implementation of a key / value store (Map<long,byte []>) outside of the Java heap,
 therefore not affected by garbage collection (GC).
 
-It aims to provide a usable implementation, and therefore integrates the LZ4 compression 
+It aims to provide a usable implementation, and therefore integrates the LZ4 compression
 library https://github.com/Cyan4973/lz4 to provide a compact storage.
 
 The implementation also provides basic transactional functionality:
@@ -33,7 +33,7 @@ The build files assume Eclipse 4.4 LUNA with CDT.
 All classes are non-threadsafe. Following ideas of the LMAX disruptor (http://lmax-exchange.github.io/disruptor/), you can operate
 single-threaded as long as you're fast enough. You can however create multiple independent transactions.
 In case your map corresponds to a partition of a classical database table (for example data of a specific tenant), you can run a separate thread
-per tenant in parallel. 
+per tenant in parallel.
 
 Due to the very simple internal data structures, transactions are currently limited to 256,000 row changes.
 

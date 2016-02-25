@@ -280,4 +280,3 @@ JNIEXPORT void JNICALL Java_de_jpaw_offHeap_OffHeapTransaction_natRollback
     fprintf(stderr, "ROLLBACK END\n");
 #endif
 }
-
