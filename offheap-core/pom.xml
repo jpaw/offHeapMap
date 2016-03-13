@@ -1,16 +1,16 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    
+
     <parent>
         <groupId>de.jpaw</groupId>
         <artifactId>offheap-base</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1</version>
         <relativePath>../offheap-base/pom.xml</relativePath>
     </parent>
-    
+
     <artifactId>offheap-core</artifactId>
     <packaging>jar</packaging>
-    
+
     <dependencies>
         <dependency>
             <groupId>org.testng</groupId>
@@ -25,7 +25,7 @@
             <scope>runtime</scope>
         </dependency>
     </dependencies>
-    
+
     <build>
         <plugins>
 <!--        could not get it to work with the latest Oracle JDK
@@ -37,7 +37,7 @@
                     <javahOutputDirectory>${project.build.directory}/src/main/c</javahOutputDirectory>
                 </configuration>
             </plugin>
- -->            
+ -->
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>${antrun.plugin.version}</version>
@@ -107,7 +107,7 @@
                 <configuration>
                     <!-- cannot use target/lib because we depend on additional 4rd party libraries (lz4), which are not in this project -->
                     <argLine>-Djava.library.path=${user.home}/lib</argLine>
-                    
+
 <!-- This does not work:
                     <systemProperties>
                         <property>
@@ -115,7 +115,7 @@
                             <value>${user.home}/lib</value>
                         </property>
                     </systemProperties>
- -->                    
+ -->
                 </configuration>
             </plugin>
         </plugins>
