@@ -129,17 +129,6 @@ JNIEXPORT jbyteArray JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView
 }
 #endif
 #endif
-/* Header for class de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntry */
-
-#ifndef _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntry
-#define _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntry
-#ifdef __cplusplus
-extern "C" {
-#endif
-#ifdef __cplusplus
-}
-#endif
-#endif
 /* Header for class de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntryIterator */
 
 #ifndef _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntryIterator
@@ -155,6 +144,17 @@ extern "C" {
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_00024PrimitiveLongKeyOffHeapMapEntryIterator_natIterate
   (JNIEnv *, jobject, jlong, jlong, jint);
 
+#ifdef __cplusplus
+}
+#endif
+#endif
+/* Header for class de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntry */
+
+#ifndef _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntry
+#define _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapMapView_PrimitiveLongKeyOffHeapMapEntry
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifdef __cplusplus
 }
 #endif
@@ -259,17 +259,6 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
 }
 #endif
 #endif
-/* Header for class de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_IndexIterable */
-
-#ifndef _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_IndexIterable
-#define _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_IndexIterable
-#ifdef __cplusplus
-extern "C" {
-#endif
-#ifdef __cplusplus
-}
-#endif
-#endif
 /* Header for class de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_PrimitiveLongKeyOffHeapViewIterator */
 
 #ifndef _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_PrimitiveLongKeyOffHeapViewIterator
@@ -293,6 +282,17 @@ JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00
 JNIEXPORT jlong JNICALL Java_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_00024PrimitiveLongKeyOffHeapViewIterator_natIterate
   (JNIEnv *, jobject, jlong);
 
+#ifdef __cplusplus
+}
+#endif
+#endif
+/* Header for class de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_IndexIterable */
+
+#ifndef _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_IndexIterable
+#define _Included_de_jpaw_offHeap_PrimitiveLongKeyOffHeapIndexView_IndexIterable
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifdef __cplusplus
 }
 #endif
