@@ -66,8 +66,7 @@ public class PrimitiveLongKeyOffHeapMapView<V> extends AbstractOffHeapMap<V> imp
     // Also, the decision when to compress an entry is done within Java for added flexibility (for example overwriting the decision method).
     //
 
-    /** Removes the entry stored for key from the map (if it did exist).
-     * @return */
+    /** Removes the entry stored for key from the map (if it did exist). */
     @Override
     public boolean delete(long key) {
         throw new UnsupportedOperationException("Cannot delete on a readonly view");
