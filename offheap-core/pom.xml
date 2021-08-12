@@ -4,8 +4,7 @@
     <parent>
         <groupId>de.jpaw</groupId>
         <artifactId>offheap-base</artifactId>
-        <version>0.8.0</version>
-        <relativePath>../offheap-base/pom.xml</relativePath>
+        <version>0.9.0</version>
     </parent>
 
     <artifactId>offheap-core</artifactId>
@@ -32,7 +31,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>native-maven-plugin</artifactId>
-                <version>1.0-alpha-8</version>
+                <version>1.0-alpha-11</version>
                 <configuration>
                     <javahOutputDirectory>${project.build.directory}/src/main/c</javahOutputDirectory>
                 </configuration>
@@ -56,6 +55,7 @@
                                     <class name="de.jpaw.offHeap.LongToByteArrayOffHeapMap"/>
                                 </javah>
                                  -->
+                                <!-- does not work after JDK 8 because javah has been removed
                                 <exec executable="javah" >
                                     <arg value="-o" />
                                     <arg value="${project.basedir}/src/main/c/jpawTransaction.h" />
@@ -76,7 +76,9 @@
                                     <arg value="de.jpaw.offHeap.PrimitiveLongKeyOffHeapIndexView" />
                                     <arg value="de.jpaw.offHeap.AbstractOffHeapMap" />
                                 </exec>
+                                -->
 
+                                <echo>Compiling JNI headers</echo>
                                 <exec executable="make" ></exec>
                             </target>
                         </configuration>

@@ -40,7 +40,7 @@ Due to the very simple internal data structures, transactions are currently limi
 
 ## Compatibility notes
 
-The build uses Java 8 (Oracle JDK), as it's the current environment.
+The build uses Java 8 (OpenJDK), as it's the current environment.
 
 
 ## Revision numbering

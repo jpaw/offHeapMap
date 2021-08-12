@@ -4,8 +4,7 @@
     <parent>
         <groupId>de.jpaw</groupId>
         <artifactId>offheap-base</artifactId>
-        <version>0.8.0</version>
-        <relativePath>../offheap-base/pom.xml</relativePath>
+        <version>0.9.0</version>
     </parent>
 
     <artifactId>offheap-bom</artifactId>
